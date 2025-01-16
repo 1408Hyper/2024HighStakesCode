@@ -663,8 +663,8 @@ namespace hyper {
 			/// @brief Sets the brake mode for each motor group
 			/// @param mode Brake mode to set the motors toS
 			void setBrakeModes(pros::motor_brake_mode_e_t mode) {
-				left_mg.set_brake_mode(mode);
-				right_mg.set_brake_mode(mode);
+				left_mg.set_brake_mode_all(mode);
+				right_mg.set_brake_mode_all(mode);
 			}
 
 			Drivetrain(DrivetrainArgs args) : 
@@ -676,8 +676,7 @@ namespace hyper {
 				gps(args.ports.gpsPort, 0.4, 0, 0.5, 1.3, 270) {
 					setDriveControlMode();
 					calibrateIMU();
-
-					//setBrakeModes(pros::E_MOTOR_BRAKE_HOLD);
+					setBrakeModes(pros::E_MOTOR_BRAKE_HOLD);
 				};
 		private:
 			void prepareArcadeLateral(float& lateral) {
@@ -704,9 +703,9 @@ namespace hyper {
 				float turnDecrease = 1 * turn * lateralCompensation * driveControlSpeed.arcSpeed;
 
 				if (turn > 0) { // Turning to right so we decrease the left MG
-					turnCoeffs.left = turnDecrease;
+					turnCoeffs.left -= turnDecrease;
 				} else { // Turning to left so we decrease the right MG
-					turnCoeffs.right = turnDecrease;
+					turnCoeffs.right -= turnDecrease;
 				}
 
 				//pros::lcd::print(2, ("Left Turn Coef + turnDecrease: " + ", " + std::to_string(turnDecrease)).c_str());
