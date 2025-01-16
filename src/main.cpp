@@ -595,11 +595,11 @@ namespace hyper {
 
 					// lower arc speed is lower turning
 
-					DriveControlSpeed(float turnSpeed = 1, float forwardBackSpeed = 2, float arcSpeed = 0.5) :
+					DriveControlSpeed(float turnSpeed = 1, float forwardBackSpeed = 1, float arcSpeed = 0.7) :
 						turnSpeed(turnSpeed), 
 						arcSpeed(arcSpeed) {
 							setForwardBackSpeed(forwardBackSpeed);
-						}
+					}
 			};
 
 
@@ -658,7 +658,7 @@ namespace hyper {
 
 			int pidInvertTurn = 1;
 
-			float arcDeadband = 5;
+			float arcDeadband = 30;
 
 			/// @brief Sets the brake mode for each motor group
 			/// @param mode Brake mode to set the motors toS
@@ -673,9 +673,10 @@ namespace hyper {
 				right_mg(args.ports.right),
 				imu(args.ports.imuPort),
 				odomEnc(args.ports.odomPorts[0], args.ports.odomPorts[1]),
-				gps(args.ports.gpsPort, -0.4, 0, 180) {
+				gps(args.ports.gpsPort, 0.4, 0, 0.5, 1.3, 270) {
 					setDriveControlMode();
 					calibrateIMU();
+
 					//setBrakeModes(pros::E_MOTOR_BRAKE_HOLD);
 				};
 		private:
@@ -700,16 +701,16 @@ namespace hyper {
 				// 0-1 range of percentage of lateral movement against max possible lateral movement
 				float lateralCompensation = lateral / driveControlSpeed.getMaxLateral();
 				// Decrease the turn speed when moving laterally (higher turn should be higher turnDecrease)
-				float turnDecrease = -1 * turn * lateralCompensation * driveControlSpeed.arcSpeed;
+				float turnDecrease = 1 * turn * lateralCompensation * driveControlSpeed.arcSpeed;
 
 				if (turn > 0) { // Turning to right so we decrease the left MG
-					turnCoeffs.left -= turnDecrease;
+					turnCoeffs.left = turnDecrease;
 				} else { // Turning to left so we decrease the right MG
-					turnCoeffs.right -= turnDecrease;
+					turnCoeffs.right = turnDecrease;
 				}
 
-				//pros::lcd::print(5, ("Left Turn Coef + turnDecrease: " + ", " + std::to_string(turnDecrease)).c_str());
-				pros::lcd::print(6, ("Right Turn Coef: " + std::to_string(turnCoeffs.right)).c_str());
+				//pros::lcd::print(2, ("Left Turn Coef + turnDecrease: " + ", " + std::to_string(turnDecrease)).c_str());
+				pros::lcd::print(6, ("TD: " + std::to_string(turnDecrease)).c_str());
 			}
 
 			TurnCoefficients calculateArcadeTurns(float turn, float lateral) {
@@ -736,11 +737,14 @@ namespace hyper {
 				prepareArcadeLateral(lateral);
 
 				TurnCoefficients turnCoeffs = calculateArcadeTurns(turn, lateral);
+				
+				pros::lcd::print(1, ("T, L:" + std::to_string(turn) + ", " + std::to_string(lateral)).c_str());
 
 				// Ensure voltages are within correct ranges
 				std::int32_t left_voltage = prepareMoveVoltage(lateral - turnCoeffs.left);
 				std::int32_t right_voltage = prepareMoveVoltage(lateral + turnCoeffs.right);
 
+				pros::lcd::print(2, ("L/R COEF: " + std::to_string(turnCoeffs.left) + ", ", std::to_string(turnCoeffs.right)).c_str());
 				pros::lcd::print(7, ("LEFT/RIGHT: " + std::to_string(left_voltage) + ", " + std::to_string(right_voltage)).c_str());
 
 				left_mg.move(left_voltage);
@@ -1072,15 +1076,13 @@ namespace hyper {
 			/// @param pos Position to move to in inches (use negative for backward)
 			// TODO: Tuning required
 			// direction bool is for x, invert for y
-			void PIDGps(double pos, PIDOptions options = {
-				0.15, 0.0, 0.6, 3, 6000
-			}, bool direction = true) {
+			void PIDGps(double pos, bool direction = true, PIDOptions options = {
+				0.15, 0.0, 0.6, 0.1, 6000
+			}) {
 				pos /= inchesPerTick;
 				pos *= -1;
 
-				float error = pos;
 				float motorPos = 0;
-				float lastError = 0;
 				float derivative = 0;
 				float integral = 0;
 				float out = 0;
@@ -1088,20 +1090,32 @@ namespace hyper {
 				float maxCycles = options.timeLimit / moveDelayMs;
 				float cycles = 0;
 
+				bool onFirstRun = true;
+				bool targetPositive = true;
+
 				if (direction) {
-					pos += gps.get_position_y();
-				} else {
 					pos += gps.get_position_x();
+				} else {
+					pos += gps.get_position_y();
 				}
+
+				float error = pos;
+
+				int lastErrorTimes = 0;
+				float lastError = error;
+				derivative = error - lastError;
+				integral = error;
+
+				pros::lcd::print(2, ("GPS Pos: " + std::to_string(pos)).c_str());
 
 				// with moving you just wanna move both MGs at the same speed
 
 				while (true) {
 					// get avg error
 					if (direction) {
-						motorPos = gps.get_position_y();
-					} else {
 						motorPos = gps.get_position_x();
+					} else {
+						motorPos = gps.get_position_y();
 					}
 
 					error = pos - motorPos;
@@ -1113,20 +1127,48 @@ namespace hyper {
 					}
 
 					derivative = error - lastError;
+
+					if (onFirstRun) {
+						if (derivative > 0) {
+							targetPositive = true;
+						} else {
+							targetPositive = false;
+						}
+
+						onFirstRun = false;
+					}
+
 					out = (options.kP * error) + (options.kI * integral) + (options.kD * derivative);
 					lastError = error;
 
 					out *= 75; // convert to mV
-					out = std::clamp(out, -maxVoltage, maxVoltage);
+					out = std::clamp(out, maxVoltage, -maxVoltage);
 					moveSingleVoltage(out);
 
+					pros::lcd::print(4, ("GPS " + std::to_string(motorPos)).c_str());
+					pros::lcd::print(7, ("PIDMove Out: " + std::to_string(out)).c_str());
+					pros::lcd::print(5, ("PIDMove Error: " + std::to_string(error)).c_str());
+
+					master->print(0, 0, ("ERROR: " + std::to_string(error)).c_str());
+
 					if (std::fabs(error) <= options.errorThreshold) {
+						pros::lcd::print(7, "PIDGPS COMPLETE");
 						break;
 					}
 
-					pros::lcd::print(4, ("PIDMove Motor Pos: " + std::to_string(motorPos)).c_str());
-					pros::lcd::print(5, ("PIDMove Out: " + std::to_string(out)).c_str());
-					pros::lcd::print(7, ("PIDMove Error: " + std::to_string(error)).c_str());
+					if (std::fabs(error) >= std::fabs(lastError)) {
+						lastErrorTimes++;
+					}
+
+					if (lastErrorTimes >= 3) {
+						pros::lcd::print(7, "PIDGPS ERROR LIMIT REACHED");
+						//break;
+					}
+
+					if (integral >= pos) {
+						pros::lcd::print(7, "PIDGPS INTEGRAL LIMIT REACHED");
+						break;
+					}
 
 					if (cycles >= maxCycles) {
 						pros::lcd::print(4, "PIDMove Time limit reached");
@@ -1735,6 +1777,7 @@ namespace hyper {
 
 			void testGpsAuton() {
 				cm->dvt.PIDGps(0.6096);
+				pros::delay(20000);
 			}
 
 			void aadiAuton() {
@@ -1748,15 +1791,6 @@ namespace hyper {
                 cm->dvt.PIDTurn(-57);
                 cm->conveyer.move(true);
                 cm->dvt.PIDMove(30);
-			}
-
-			void preRun() {
-				cm->dvt.setBrakeModes(pros::E_MOTOR_BRAKE_HOLD);
-			}
-
-			void postRun() {
-				cm->dvt.setBrakeModes(pros::E_MOTOR_BRAKE_COAST);
-				cm->mogoMech.actuate(false);
 			}
 		protected:
 		public:
