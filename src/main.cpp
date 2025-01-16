@@ -235,12 +235,12 @@ namespace hyper {
 					if (directionForward) {
 						mg.move_velocity(speeds.fwd);
 						if (outputSpeeds) {
-							pros::lcd::print(2, "motor going!!");
+							//pros::lcd::print(2, "motor going!!");
 						}
 					} else {
 						mg.move_velocity(speeds.back);
 						if (outputSpeeds) {
-							pros::lcd::print(2, "motor not going :(");
+							//pros::lcd::print(2, "motor not going :(");
 						}
 					}
 				} else {
@@ -1676,10 +1676,11 @@ namespace hyper {
 			}
 
 			void advancedAuton() {
+				
 				// Deposit preload on low wall stake
 				pros::delay(2000);
 				cm->dvt.PIDMove(8.8);
-				pros::lcd::print(2, "Initial phase complete");
+				//pros::lcd::print(2, "Initial phase complete");
 				pros::delay(500);
 
 				// Move to mogo
@@ -2040,6 +2041,10 @@ void initialize() {
 	INIT_CHASSIS();
 
 	pros::lcd::register_btn1_cb(on_center_button);
+	pros::Gps gps1(2, 1.2, 0.4, 90);
+  // Center of the field is (0,0), uses 4 quadrant cartesian system for coordinates
+  // This is another example where the position is set after the constructor is called:
+  	gps1.set_position(1.2, 0.4, 90);
 }
 
 /**

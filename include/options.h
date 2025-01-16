@@ -53,7 +53,7 @@
 #define DO_SKILLS_PREP true
 #define DO_POST_AUTON true
 #define DO_SKILLS_AUTON false
-#define DO_OP_CONTROL true
+#define DO_OP_CONTROL false
 
 // Ports for the drivetrain motors
 #define LEFT_DRIVE_PORTS {6, 7, 18}
