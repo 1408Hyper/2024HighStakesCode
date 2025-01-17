@@ -1071,15 +1071,50 @@ namespace hyper {
 				moveStop();
 			}
 
+			void BangGPS(double pos, int velocity = -200) {
+				bool direction = pos > 0;
+
+				int lastPos = 0;
+
+				int difference = 0;
+				if (direction) {
+					lastPos = gps.get_position_x();
+				} else {
+					lastPos = gps.get_position_y();
+				}
+				float motorPos = 0;
+
+				moveSingleVelocity(velocity);
+
+				while (true) {
+					if (direction) {
+						motorPos = gps.get_position_x();
+					} else {
+						motorPos = gps.get_position_y();
+					}
+
+					difference += motorPos - lastPos;
+
+					if (difference >= pos) {
+						break;
+					}
+
+					lastPos = motorPos;
+					pros::delay(20);
+				}
+
+				moveStop();
+			}
+
 			/// @brief Move to a specific position using PID with GPS
 			/// @param pos Position to move to in inches (use negative for backward)
 			// TODO: Tuning required
 			// direction bool is for x, invert for y
 			void PIDGps(double pos, bool direction = true, PIDOptions options = {
-				0.15, 0.0, 0.6, 0.1, 6000
+				0.1, 0.0, 0.0, 0.1, 6000
 			}) {
-				pos /= inchesPerTick;
-				pos *= -1;
+				pos /= 1;
+				//pos *= -1;
 
 				float motorPos = 0;
 				float derivative = 0;
@@ -1093,9 +1128,9 @@ namespace hyper {
 				bool targetPositive = true;
 
 				if (direction) {
-					pos += gps.get_position_x();
-				} else {
 					pos += gps.get_position_y();
+				} else {
+					pos += gps.get_position_x();
 				}
 
 				float error = pos;
@@ -1105,16 +1140,16 @@ namespace hyper {
 				derivative = error - lastError;
 				integral = error;
 
-				pros::lcd::print(2, ("GPS Pos: " + std::to_string(pos)).c_str());
+				pros::lcd::print(2, ("GPS Pos: " + std::to_string(gps.get_position_x())).c_str());
 
 				// with moving you just wanna move both MGs at the same speed
 
 				while (true) {
 					// get avg error
 					if (direction) {
-						motorPos = gps.get_position_x();
-					} else {
 						motorPos = gps.get_position_y();
+					} else {
+						motorPos = gps.get_position_x();
 					}
 
 					error = pos - motorPos;
@@ -1140,7 +1175,7 @@ namespace hyper {
 					out = (options.kP * error) + (options.kI * integral) + (options.kD * derivative);
 					lastError = error;
 
-					out *= 75; // convert to mV
+					out *= -0.01; // convert to mV
 					out = std::clamp(out, maxVoltage, -maxVoltage);
 					moveSingleVoltage(out);
 
@@ -1148,10 +1183,10 @@ namespace hyper {
 					pros::lcd::print(7, ("PIDMove Out: " + std::to_string(out)).c_str());
 					pros::lcd::print(5, ("PIDMove Error: " + std::to_string(error)).c_str());
 
-					master->print(0, 0, ("ERROR: " + std::to_string(error)).c_str());
+					master->print(0, 0, ("error: " + std::to_string(error)).c_str());
 
 					if (std::fabs(error) <= options.errorThreshold) {
-						pros::lcd::print(7, "PIDGPS COMPLETE");
+						master->print(0, 0, "PIDGPS YAY %f", error);
 						break;
 					}
 
@@ -1160,13 +1195,13 @@ namespace hyper {
 					}
 
 					if (lastErrorTimes >= 3) {
-						pros::lcd::print(7, "PIDGPS ERROR LIMIT REACHED");
+						//pros::lcd::print(7, "PIDGPS ERROR LIMIT REACHED");
 						//break;
 					}
 
 					if (integral >= pos) {
-						pros::lcd::print(7, "PIDGPS INTEGRAL LIMIT REACHED");
-						break;
+						//pros::lcd::print(7, "PIDGPS INTEGRAL LIMIT REACHED");
+						//break;
 					}
 
 					if (cycles >= maxCycles) {
@@ -1703,7 +1738,6 @@ namespace hyper {
 				// 72 = 3 tiles = 3 feet
 				// 96 = 4 tiles = 4 feet
 				cm->dvt.PIDMove(-24);
-				cm->doinker.actuate(true);
 			}
 
 			void testIMUAuton() {
@@ -1775,7 +1809,8 @@ namespace hyper {
 			}
 
 			void testGpsAuton() {
-				cm->dvt.PIDGps(0.6096);
+				//cm->dvt.PIDGps(0.6096);
+				cm->dvt.BangGPS(0.2096);
 				pros::delay(20000);
 			}
 
