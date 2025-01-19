@@ -5,7 +5,7 @@
 																																																																																																									#define _HYPER_UNLEASH_HELL delete this, *(reinterpret_cast<int*>(this) + 1) = 0xDEADBEEF;
 // uses ISO/C++20 standard
 // added libraries/includes:
-// fmt (header-only)
+// pros
 
 // ending in -mech classes are for pneumatics
 
@@ -17,6 +17,8 @@
 // WARNING: do NOT just put "Args" as the name of an args struct in any class
 // instead, put the class name in front of it (e.g. DrivetrainArgs) for CLARITY
 // in derived functions & then for factories just do using e.g. using ArgsType = DrivetrainArgs;
+
+// for printing to brain and controller pls USE NEW LOG AND TELL FUNCS!!!
 
 // TODO: seperate PID functions into a separate class for cleanliness
 
@@ -87,10 +89,44 @@ namespace hyper {
 	/// @brief Class for components of the chassis to derive from
 	class AbstractComponent {
 		private:
+		public:
+			static constexpr std::uint8_t MAX_BRAIN_LINES = 8;
+			static constexpr std::uint8_t MAX_CONTROLLER_LINES = 2;
+			static constexpr std::uint8_t CONTROLLER_TXT_START_COL = 0;
 		protected:
 			AbstractChassis* chassis;
 
 			pros::Controller* master;
+
+			/// @brief Log something to the brain safely
+			/// @param line Line to print the message on (check class consts for max lines)
+			/// @param message Message to print
+			/// @param additional Additional arguments to print
+			/// @return Success/fail state of the brain printing
+			template <typename... T>
+			bool log(const std::uint8_t line, const string& message, T&&... additional) {
+				if (line > MAX_BRAIN_LINES) {
+					return false;
+				}
+
+				pros::lcd::print(line, message.c_str(), additional...);
+				return true;
+			}
+
+			/// @brief Tell the driver something via the controller safely
+			/// @param line Line to print the message on (check class consts for max lines)
+			/// @param message Message to print
+			/// @param additional Additional arguments to print
+			/// @return Success/fail state of the controller printing
+			template <typename... T>
+			bool tell(const std::uint8_t line, const string& message, T&&... additional) {
+				if (line > MAX_CONTROLLER_LINES) {
+					return false;
+				}
+
+				master->print(line, CONTROLLER_TXT_START_COL, message.c_str(), additional...);
+				return true;
+			}
 		public:
 			/// @brief Args for AbstractComponent object
 			/// @param chassis AbstractChassis derived object to be used for the component
@@ -743,7 +779,7 @@ namespace hyper {
 				std::int32_t left_voltage = prepareMoveVoltage(lateral - turnCoeffs.left);
 				std::int32_t right_voltage = prepareMoveVoltage(lateral + turnCoeffs.right);
 
-				pros::lcd::print(2, ("L/R COEF: " + std::to_string(turnCoeffs.left) + ", ", std::to_string(turnCoeffs.right)).c_str());
+				pros::lcd::print(2, ("L/R COEF: " + std::to_string(turnCoeffs.left) + ", " + std::to_string(turnCoeffs.right)).c_str());
 				pros::lcd::print(7, ("LEFT/RIGHT: " + std::to_string(left_voltage) + ", " + std::to_string(right_voltage)).c_str());
 
 				left_mg.move(left_voltage);
@@ -1228,6 +1264,23 @@ namespace hyper {
 	}; // class Drivetrain
 
 	class MogoMech : public AbstractMech {
+		public:
+			/// @brief Struct for telling the driver info
+			/// @param on Whether to tell the driver
+			/// @param line Line to tell the driver on
+			/// @param prefixMsg Prefix message to tell the driver
+			/// @param engagedMsg Message to tell the driver when engaged
+			/// @param disengagedMsg Message to tell the driver when disengaged
+			struct TellDriverInfo {
+				bool on = false;
+				std::uint8_t line = 0;
+
+				string prefixMsg = "Mogo engaged: ";
+				string engagedMsg = "YES";
+				string disengagedMsg = "NO";
+			};
+
+			TellDriverInfo tellDriverInfo = {};
 		private:
 			bool lastPressed = false;
 
@@ -1238,10 +1291,15 @@ namespace hyper {
 
 					if (engaged) {
 						actuate(false);
-						master->print(0, 0, "Mogo engaged: YES");
 					} else {
 						actuate(true);
-						master->print(0, 0, "Mogo engaged: NO");
+					}
+
+					if (tellDriverInfo.on) {
+						engaged = getEngaged();
+						string suffix = (engaged) ? tellDriverInfo.engagedMsg : tellDriverInfo.disengagedMsg;
+
+						tell(tellDriverInfo.line, tellDriverInfo.prefixMsg + suffix);
 					}
 				}
 			}
@@ -1484,8 +1542,9 @@ namespace hyper {
 			}
 		private:
 			void manualControl() {
-				bool belowLimit = sensor.get_position() < limit;
-				//bool belowLimit = true;
+				bool sensorPos = sensor.get_position();
+				//bool belowLimit = sensor.get_position() < limit;
+				bool belowLimit = true;
 
 				if (master->get_digital(manualBtns.fwd) && belowLimit) {
 					move(true);
@@ -1494,6 +1553,8 @@ namespace hyper {
 				} else {
 					move(false);
 				}
+
+				tell(0, "LB Pos: %d", sensorPos);
 			}
 
 			void upBtnControl() {
@@ -1529,7 +1590,9 @@ namespace hyper {
 				} else {
 					mg.move_absolute(targets[currentTarget], speeds.fwd);
 				}
-				// TODO: implement moving the lady brown to targets with PID
+				
+				// TODO: implement moving the lady brown to targets with rotation sensor instead of motor ticks
+				// for more accuracy
 			}
 	}; // class LadyBrown
 
@@ -2005,7 +2068,7 @@ namespace hyper {
 	bool isNumBetween(T num, T min, T max) {
 		assertArithmetic(num);
 
-		if ((num > min) && (num < max)) {
+		if ((num >= min) && (num <= max)) {
 			return true;
 		} else {
 			return false;
