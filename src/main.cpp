@@ -716,7 +716,7 @@ namespace hyper {
 				float turnDecrease = 1 * turn * lateralCompensation * dynamicArcSpeed;
 
 				if (lateral > 0) {
-					turnDecrease *= turn * 0.01;
+					turnDecrease *= turn * 0.0001;
 				}
 
 				if (turn > 0) { // Turning to right so we decrease the left MG
