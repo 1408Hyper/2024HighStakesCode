@@ -54,7 +54,7 @@
 #define MATCH_AUTON_TEST false
 
 #define DO_SKILLS_PREP true
-#define DO_POST_AUTON true
+#define DO_POST_AUTON false
 #define DO_OP_CONTROL true
 
 // Ports for the drivetrain motors

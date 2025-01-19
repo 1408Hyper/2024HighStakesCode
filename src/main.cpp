@@ -56,6 +56,12 @@ namespace hyper {
 		pros::controller_digital_e_t back;
 	};
 
+	/// @brief Struct for motor move bounds
+	struct MotorBounds {
+		static constexpr std::int32_t MOVE_MIN = -127;
+		static constexpr std::int32_t MOVE_MAX = 127;
+	};
+
 	// Class declarations
 
 	/// @brief Abstract chassis class for if you want a custom chassis class
@@ -134,7 +140,7 @@ namespace hyper {
 				AbstractChassis* chassis;
 			};
 
-			/// @brief Creates AbstractComponent object (WARNING: Use ComponentArgsFactory to create args instead of directly)
+			/// @brief Creates AbstractComponent object
 			/// @param args Args AbstractComponent object (check args struct for more info)
 			AbstractComponent(AbstractComponentArgs args) : 
 			chassis(args.chassis),
@@ -160,35 +166,6 @@ namespace hyper {
 
 			virtual ~AbstractComponent() = default;
 	}; // class ChassisComponent
-
-	/// @brief Class which instantiates component arguments easily
-	class ComponentArgsFactory {
-		private:
-		protected:
-		public:
-			// !!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			// ACA = AbstractComponentArgs
-			// !!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-			AbstractComponent::AbstractComponentArgs aca;
-
-			/// @brief Args for component factory object
-			/// @param aca Args to instantiate any abstract component
-			struct ComponentArgsFactoryArgs {
-				AbstractComponent::AbstractComponentArgs aca;
-			};
-
-			/// @brief Creates component factory object
-			/// @param args Args for component factory object (check args struct for more info)
-			ComponentArgsFactory(ComponentArgsFactoryArgs args) : 
-				aca(args.aca) {};
-
-			/// @brief Manages safe creation of args for a specific component
-			template <typename ComponentType, typename... Args>
-			typename ComponentType::ArgsType create(Args&&... args) {
-				return {aca, std::forward<Args>(args)...};
-			}
-	}; // class ComponentFactory
 
 	class AbstractMech : public AbstractComponent {
 		private:
@@ -1501,10 +1478,8 @@ namespace hyper {
 		public:
 			/// @brief Args for Lady Brown object
 			/// @param abstractMGArgs Args for AbstractMG object
-			/// @param ladyBrownPorts Vector of ports for Lady Brown motors
 			struct LadyBrownArgs {
 				AbstractMGArgs abstractMGArgs;
-				MGPorts ladyBrownPorts;
 				std::int8_t sensorPort;
 			};
 
@@ -1518,7 +1493,7 @@ namespace hyper {
 			BtnManager upBtn;
 			bool atManualControl = false;
 
-			double limit = 10000;
+			double limit = 33600;
 
 			Buttons manualBtns = {
 				pros::E_CONTROLLER_DIGITAL_UP,
@@ -1542,9 +1517,9 @@ namespace hyper {
 			}
 		private:
 			void manualControl() {
-				bool sensorPos = sensor.get_position();
-				//bool belowLimit = sensor.get_position() < limit;
-				bool belowLimit = true;
+				std::int32_t sensorPos = sensor.get_position();
+				bool belowLimit = sensor.get_position() < limit;
+				//bool belowLimit = true;
 
 				if (master->get_digital(manualBtns.fwd) && belowLimit) {
 					move(true);
@@ -1554,7 +1529,9 @@ namespace hyper {
 					move(false);
 				}
 
-				tell(0, "LB Pos: %d", sensorPos);
+				// debug thingy telling us the sensor pos for limit
+				tell(0, "LB Pos: " + std::to_string(sensorPos));
+				log(7, "LB Pos: " + std::to_string(sensorPos));
 			}
 
 			void upBtnControl() {
@@ -1590,13 +1567,12 @@ namespace hyper {
 				} else {
 					mg.move_absolute(targets[currentTarget], speeds.fwd);
 				}
-				
+
 				// TODO: implement moving the lady brown to targets with rotation sensor instead of motor ticks
 				// for more accuracy
 			}
 	}; // class LadyBrown
 
-	
 	class Doinker : public AbstractMech {
 		private:
 		protected:
@@ -1635,8 +1611,6 @@ namespace hyper {
 		private:
 		protected:
 		public:
-			ComponentArgsFactory factory;
-
 			Drivetrain dvt;
 
 			MogoMech mogoMech;
@@ -1661,29 +1635,29 @@ namespace hyper {
 				char doinkerPort;
 				MGPorts conveyerPorts;
 				MGPorts ladyBrownPorts;
+				std::int8_t ladyBrownRotSensorPort;
 				std::int8_t mogoStopperPort;
 			};
 
 			/// @brief Args for component manager object
-			/// @param abstractComponentArgs Args for AbstractComponent object
+			/// @param aca Args for AbstractComponent object
 			/// @param user Args for component manager object passed to the chassis
 			struct ComponentManagerArgs {
-				AbstractComponentArgs abstractComponentArgs;
+				AbstractComponentArgs aca;
 				ComponentManagerUserArgs user;
 			};
 
 			/// @brief Constructor for component manager object
 			/// @param args Args for component manager object (see args struct for more info)
 			ComponentManager(ComponentManagerArgs args) : 
-				AbstractComponent(args.abstractComponentArgs),
-				factory({args.abstractComponentArgs}),
+				AbstractComponent(args.aca),
 
-				dvt(factory.create<Drivetrain>(args.user.dvtPorts)),
-				mogoMech(factory.create<MogoMech>(args.user.mogoMechPort)),
-				conveyer(factory.create<Conveyer>(args.user.conveyerPorts)),
-				ladyBrown(factory.create<LadyBrown>(args.user.ladyBrownPorts)),
-				doinker(factory.create<Doinker>(args.user.doinkerPort)),
-				mogoStopper(factory.create<MogoStopper>(args.user.mogoStopperPort)) {					// Add component pointers to vector
+				dvt({args.aca, args.user.dvtPorts}),
+				mogoMech({args.aca, args.user.mogoMechPort}),
+				conveyer({args.aca, args.user.conveyerPorts}),
+				ladyBrown({{args.aca, args.user.ladyBrownPorts}, args.user.ladyBrownRotSensorPort}),
+				doinker({args.aca, args.user.doinkerPort}),
+				mogoStopper({args.aca, args.user.mogoStopperPort}) {					// Add component pointers to vector
 					// MUST BE DONE AFTER INITIALISATION not BEFORE because of pointer issues
 					components = {
 						&dvt,
@@ -2037,12 +2011,6 @@ namespace hyper {
 		return oss.str();
 	}
 
-	/// @brief Struct for motor move bounds
-	struct MotorBounds {
-		static constexpr std::int32_t MOVE_MIN = -127;
-		static constexpr std::int32_t MOVE_MAX = 127;
-	};
-
 	/// @brief Assert that a value is arithmetic
 	/// @param val Value to assert
 	template <typename T>
@@ -2144,8 +2112,10 @@ hyper::AbstractChassis* currentChassis;
 
 void initDefaultChassis() {
 	static hyper::Chassis defaultChassis({
-		{{LEFT_DRIVE_PORTS, RIGHT_DRIVE_PORTS, IMU_PORT, ODOM_ENC_PORTS, GPS_SENSOR_PORT}, 
-		MOGO_MECH_PORT, DOINKER_PORT, CONVEYER_PORTS, LADY_BROWN_PORTS, MOGO_SENSOR_PORT}});
+		{{LEFT_DRIVE_PORTS, RIGHT_DRIVE_PORTS, IMU_PORT, ODOM_ENC_PORTS, GPS_SENSOR_PORT}, // Drivetrain args
+		MOGO_MECH_PORT, DOINKER_PORT, // Mech args
+		CONVEYER_PORTS, LADY_BROWN_PORTS, // MG args
+		LADY_BROWN_ROT_SENSOR_PORT, MOGO_SENSOR_PORT}}); // Sensor args
 	
 	currentChassis = &defaultChassis;
 }
@@ -2290,4 +2260,4 @@ void opcontrol() {
 // i like c++ the most
 
 // anti quick make nothing comment thingy
-// aaa
+// aaaa

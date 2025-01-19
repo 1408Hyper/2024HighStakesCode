@@ -59,8 +59,6 @@
 #include <cstdlib>
 // Mapping dictionary
 #include <map>
-// Type traits
-#include <type_traits>
 
 // fmt is gone
 
