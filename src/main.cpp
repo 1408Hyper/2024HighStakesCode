@@ -700,8 +700,6 @@ namespace hyper {
 				if (preventBackMove && (lateral < 0)) {
 					lateral = 0;
 				}
-
-				lateral *= driveControlSpeed.getForwardBackSpeed();
 			}
 
 			// Calculate the movement of the robot when turning and moving laterally at the same time
@@ -721,13 +719,11 @@ namespace hyper {
 					turnCoeffs.right -= turnDecrease;
 				}
 
-				//pros::lcd::print(2, ("Left Turn Coef + turnDecrease: " + ", " + std::to_string(turnDecrease)).c_str());
 				pros::lcd::print(6, ("TD: " + std::to_string(turnDecrease)).c_str());
 			}
 
 			TurnCoefficients calculateArcadeTurns(float turn, float lateral) {
 				turn *= 1;
-				turn *= driveControlSpeed.turnSpeed;
 
 				TurnCoefficients turnCoeffs = {turn, turn};
 
@@ -751,6 +747,12 @@ namespace hyper {
 				TurnCoefficients turnCoeffs = calculateArcadeTurns(turn, lateral);
 				
 				pros::lcd::print(1, ("T, L:" + std::to_string(turn) + ", " + std::to_string(lateral)).c_str());
+
+				// Calculate speeds
+				lateral *= driveControlSpeed.getForwardBackSpeed();
+
+				turnCoeffs.left *= driveControlSpeed.turnSpeed;
+				turnCoeffs.right *= driveControlSpeed.turnSpeed;
 
 				// Ensure voltages are within correct ranges
 				std::int32_t left_voltage = prepareMoveVoltage(lateral - turnCoeffs.left);
