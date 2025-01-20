@@ -2169,10 +2169,6 @@ void initialize() {
 	INIT_CHASSIS();
 
 	pros::lcd::register_btn1_cb(on_center_button);
-	pros::Gps gps1(2, 1.2, 0.4, 90);
-  // Center of the field is (0,0), uses 4 quadrant cartesian system for coordinates
-  // This is another example where the position is set after the constructor is called:
-  	gps1.set_position(1.2, 0.4, 90);
 }
 
 /**
