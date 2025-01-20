@@ -103,6 +103,23 @@ namespace hyper {
 			AbstractChassis* chassis;
 
 			pros::Controller* master;
+		public:
+			/// @brief Args for AbstractComponent object
+			/// @param chassis AbstractChassis derived object to be used for the component
+			struct AbstractComponentArgs {
+				AbstractChassis* chassis;
+			};
+
+			/// @brief Creates AbstractComponent object
+			/// @param args Args AbstractComponent object (check args struct for more info)
+			AbstractComponent(AbstractComponentArgs args) : 
+			chassis(args.chassis),
+			master(&args.chassis->getController()) {
+				// :) u know what this does
+																																																																																			#ifndef _HYPER_UNLOCK_66_75_63_6B
+																																																																																				_HYPER_UNLEASH_HELL
+																																																																																			#endif
+			};
 
 			/// @brief Log something to the brain safely
 			/// @param line Line to print the message on (check class consts for max lines)
@@ -133,23 +150,6 @@ namespace hyper {
 				master->print(line, CONTROLLER_TXT_START_COL, message.c_str(), additional...);
 				return true;
 			}
-		public:
-			/// @brief Args for AbstractComponent object
-			/// @param chassis AbstractChassis derived object to be used for the component
-			struct AbstractComponentArgs {
-				AbstractChassis* chassis;
-			};
-
-			/// @brief Creates AbstractComponent object
-			/// @param args Args AbstractComponent object (check args struct for more info)
-			AbstractComponent(AbstractComponentArgs args) : 
-			chassis(args.chassis),
-			master(&args.chassis->getController()) {
-				// :) u know what this does
-																																																																																			#ifndef _HYPER_UNLOCK_66_75_63_6B
-																																																																																				_HYPER_UNLEASH_HELL
-																																																																																			#endif
-			};
 
 			AbstractChassis& getChassis() {
 				return *chassis;
@@ -192,6 +192,7 @@ namespace hyper {
 			/// @param value Value to set the piston to
 			void actuate(bool value) {
 				piston.set_value(value);
+				tell(0, "PAT: " + std::to_string(value));
 				engaged = value;
 			}
 
@@ -689,7 +690,7 @@ namespace hyper {
 				gps(args.ports.gpsPort, 0.4, 0, 0.5, 1.3, 270) {
 					setDriveControlMode();
 					calibrateIMU();
-					setBrakeModes(pros::E_MOTOR_BRAKE_HOLD);
+					//setBrakeModes(pros::E_MOTOR_BRAKE_HOLD);
 				};
 		private:
 			void prepareArcadeLateral(float& lateral) {
@@ -828,14 +829,14 @@ namespace hyper {
 			/// @brief Sets movement velocity
 			/// @param leftVoltage Voltage for left motor
 			/// @param rightVoltage Voltage for right motor
-			void moveVelocity(std::int16_t leftVoltage, std::int16_t rightVoltage) {
+			void moveVelocity(std::int32_t leftVoltage, std::int32_t rightVoltage) {
 				left_mg.move_velocity(leftVoltage);
 				right_mg.move_velocity(rightVoltage);
 			}
 
 			/// @brief Moves the motors at a single velocity
 			/// @param voltage Voltage to move the motors at
-			void moveSingleVelocity(std::int16_t voltage) {
+			void moveSingleVelocity(std::int32_t voltage) {
 				moveVelocity(voltage, voltage);
 			}
 
@@ -1265,7 +1266,7 @@ namespace hyper {
 			/// @param engagedMsg Message to tell the driver when engaged
 			/// @param disengagedMsg Message to tell the driver when disengaged
 			struct TellDriverInfo {
-				bool on = false;
+				bool on = true;
 				std::uint8_t line = 0;
 
 				string prefixMsg = "Mogo engaged: ";
@@ -1546,8 +1547,8 @@ namespace hyper {
 				}
 
 				// debug thingy telling us the sensor pos for limit
-				tell(0, "LB Pos: " + std::to_string(sensorPos));
-				log(7, "LB Pos: " + std::to_string(sensorPos));
+				/*tell(0, "LB Pos: " + std::to_string(sensorPos));
+				log(7, "LB Pos: " + std::to_string(sensorPos));*/
 			}
 
 			void upBtnControl() {
@@ -1910,27 +1911,37 @@ namespace hyper {
 	class SkillsAuton : public AbstractAuton {
 		private:
 			void sector1() {
-				cm->mogoMech.actuate(false);	
-				cm->dvt.PIDMove(-9);
-				cm->mogoMech.actuate(true);
+				// horrible terrible but oh well
+				// Preload onto wall stake and go forward to clamp mogo
+				pros::adi::DigitalOut mogo(MOGO_MECH_PORT);
+				cm->tell(0, "Mogo engaged: " + std::to_string(cm->mogoMech.getEngaged()));
+				mogo.set_value(true);
+
+				cm->conveyer.move(true);
+				pros::delay(2000);
+				cm->conveyer.move(false);
+
+				cm->dvt.PIDMove(6);
+				cm->dvt.PIDTurn(-55);
+				cm->dvt.setBrakeModes(pros::E_MOTOR_BRAKE_COAST);
+				cm->dvt.PIDMove(-10);
+				cm->dvt.moveSingleVoltage(100);
+				pros::delay(200);
+				cm->dvt.moveStop();
+				cm->dvt.moveStop();
+				pros::delay(500);
+				mogo.set_value(false);
+
+				cm->tell(0, "Mogo engaged: " + std::to_string(cm->mogoMech.getEngaged()));
 				cm->conveyer.move(true);
 
-				cm->dvt.PIDTurn(-30);
-				cm->dvt.moveDelay(300);
-				cm->dvt.PIDMove(6);
-				cm->dvt.PIDTurn(180);
-				cm->dvt.PIDMove(22);
+				pros::delay(10000);
 
-				cm->dvt.PIDTurn(90);
-				cm->dvt.PIDMove(22);
-				cm->dvt.PIDTurn(90);
-				cm->dvt.PIDMove(47);
-				cm->dvt.PIDTurn(90);
+				// Collect rings onto mogo
+				/*cm->dvt.PIDTurn(-90);
+				cm->dvt.PIDTurn(-90);
+				cm->conveyer.move(true);*/
 
-				cm->dvt.moveDelay(400, false);
-				cm->mogoMech.actuate(false);
-				cm->dvt.PIDMove(5);
-				cm->dvt.PIDTurn(90);
 			}
 
 			void sector2() {
@@ -2209,22 +2220,28 @@ void pneumaticstestcontrol () {
 	}
 }
 
+void testAllAuton() {
+	if (DO_SKILLS_AUTON) {
+		currentChassis->skillsAuton();
+	}
+
+	if (DO_MATCH_AUTON) {
+		autonomous();
+	}
+}
+
 void preControl() {
 	pros::lcd::set_text(0, "> 1408Hyper mainControl ready");
 
 	bool inComp = pros::competition::is_connected();
 
 	// competition auton test safeguard
-	if (MATCH_AUTON_TEST && !inComp) {
-		autonomous();
+	if (!inComp) {
+		testAllAuton();
 	}
 
 	if (DO_SKILLS_PREP) {
 		currentChassis->skillsPrep();
-	}
-
-	if (DO_SKILLS_AUTON) {
-		currentChassis->skillsAuton();
 	}
 
 	if (DO_POST_AUTON) {
