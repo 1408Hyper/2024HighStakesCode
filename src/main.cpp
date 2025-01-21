@@ -39,11 +39,17 @@ namespace hyper {
 	template <typename T>
 	T naiveNormaliseAngle(T angle);
 
-	template <typename T>
+	/*template <typename T>
 	vector<T> getAllValues() {}
 
 	template <typename E, typename V>
-	void fillMapWithEnum(map<E, V>& map) {}
+	void fillMapWithEnum(map<E, V>& map) {}*/
+	
+	template <typename T>
+	T calcMeanFromVector(const vector<T>& vec);
+
+	template <typename T>
+	T calcMeanFromVector(const vector<T>& vec, int size);
 
 	// Structs
 
@@ -558,7 +564,11 @@ namespace hyper {
 
 			pros::MotorGroup left_mg;
 			pros::MotorGroup right_mg;
+			int leftMgSize;
+			int rightMgSize;
 
+			// PID stuff
+			// TODO: Move to separate class
 			pros::IMU imu;
 			pros::adi::Encoder odomEnc;
 			pros::Gps gps;
@@ -688,7 +698,9 @@ namespace hyper {
 				right_mg(args.ports.right),
 				imu(args.ports.imuPort),
 				odomEnc(args.ports.odomPorts[0], args.ports.odomPorts[1]),
-				gps(args.ports.gpsPort, 0.4, 0, 0.5, 1.3, 270) {
+				gps(args.ports.gpsPort, 0.4, 0, 0.5, 1.3, 270),
+				leftMgSize(args.ports.left.size()),
+				rightMgSize(args.ports.right.size()) {
 					setDriveControlMode();
 					calibrateIMU();
 					//setBrakeModes(pros::E_MOTOR_BRAKE_HOLD);
@@ -941,7 +953,12 @@ namespace hyper {
 				vector<double> leftPos = left_mg.get_position_all();
 				vector<double> rightPos = right_mg.get_position_all();
 
-				
+				double avgLeft = calcMeanFromVector(leftPos, leftMgSize);
+				double avgRight = calcMeanFromVector(rightPos, rightMgSize);
+
+				double avgPos = (avgLeft + avgRight) / 2;
+
+				return avgPos;
 			}
 
 			// TODO: Generic PID function that we can apply to PIDTurn and PIDMove
@@ -2103,6 +2120,30 @@ namespace hyper {
 		angle = std::clamp(angle, -180.0, 180.0);
 
 		return angle;
+	}
+
+	/// @brief Calculate the mean of a vector
+	/// @param vec Vector to calculate the mean of
+	/// @param size Size of the vector
+	/// @return Mean of the vector (type T)
+	template <typename T>
+	T calcMeanFromVector(const vector<T>& vec, int size) {
+		T sum = std::accumulate(vec.begin(), vec.end(), 0);
+		T mean = sum / size;
+
+		return mean;
+	}
+
+	/// @brief Calculate the mean of a vector
+	/// @param vec Vector to calculate the mean of
+	/// @return Mean of the vector (type T)
+	template <typename T>
+	T calcMeanFromVector(const vector<T>& vec) {
+		int size = vec.size();
+		T sum = std::accumulate(vec.begin(), vec.end(), 0);
+		T mean = sum / size;
+
+		return mean;
 	}
 
 	/*/// @brief Get all the values of an enum class into a vector
