@@ -671,6 +671,7 @@ namespace hyper {
 			uint32_t moveDelayMs = 2;
 
 			int pidInvertTurn = 1;
+			float pidReductionFactor = 2;
 
 			float arcDeadband = 30;
 
@@ -936,6 +937,13 @@ namespace hyper {
 				return imu.get_heading();
 			}
 
+			double getAvgMotorPos() {
+				vector<double> leftPos = left_mg.get_position_all();
+				vector<double> rightPos = right_mg.get_position_all();
+
+				
+			}
+
 			// TODO: Generic PID function that we can apply to PIDTurn and PIDMove
 			// maybe make a class for this? if it gets too complicated
 			// but that would also require refactoring Drivetrain to have an AbstractDrivetrain
@@ -1000,6 +1008,7 @@ namespace hyper {
 
 					out *= 1000; // convert to mV
 					out = std::clamp(out, -maxVoltage, maxVoltage);
+					out /= pidReductionFactor;
 					moveVoltage(-out, out);
 
 					pros::lcd::print(5, ("PIDTurn Out: " + std::to_string(out)).c_str());
@@ -1064,7 +1073,7 @@ namespace hyper {
 
 				while (true) {
 					// get avg error
-					motorPos = (left_mg.get_position() + right_mg.get_position()) / 2;
+					motorPos = getAvgMotorPos();
 					error = pos - motorPos;
 
 					integral += error;
@@ -1079,6 +1088,7 @@ namespace hyper {
 
 					out *= 1000; // convert to mV
 					out = std::clamp(out, -maxVoltage, maxVoltage);
+					out /= pidReductionFactor;
 					moveSingleVoltage(out);
 
 					if (std::fabs(error) <= options.errorThreshold) {
@@ -1915,21 +1925,20 @@ namespace hyper {
 				// Preload onto wall stake and go forward to clamp mogo
 				pros::adi::DigitalOut mogo(MOGO_MECH_PORT);
 				cm->tell(0, "Mogo engaged: " + std::to_string(cm->mogoMech.getEngaged()));
+				cm->dvt.setBrakeModes(pros::E_MOTOR_BRAKE_COAST);
 				mogo.set_value(true);
 
 				cm->conveyer.move(true);
 				pros::delay(2000);
 				cm->conveyer.move(false);
 
-				cm->dvt.PIDMove(6);
-				cm->dvt.PIDTurn(-55);
-				cm->dvt.setBrakeModes(pros::E_MOTOR_BRAKE_COAST);
-				cm->dvt.PIDMove(-10);
-				cm->dvt.moveSingleVoltage(100);
-				pros::delay(200);
-				cm->dvt.moveStop();
+				cm->dvt.PIDMove(6.25);
+				cm->dvt.PIDTurn(-90);
+				
+				cm->dvt.PIDMove(-6);
 				cm->dvt.moveStop();
 				pros::delay(500);
+
 				mogo.set_value(false);
 
 				cm->tell(0, "Mogo engaged: " + std::to_string(cm->mogoMech.getEngaged()));
@@ -1938,9 +1947,9 @@ namespace hyper {
 				pros::delay(10000);
 
 				// Collect rings onto mogo
-				/*cm->dvt.PIDTurn(-90);
 				cm->dvt.PIDTurn(-90);
-				cm->conveyer.move(true);*/
+				cm->dvt.PIDTurn(-90);
+				cm->conveyer.move(true);
 
 			}
 
