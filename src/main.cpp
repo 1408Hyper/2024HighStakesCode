@@ -5,7 +5,7 @@
 																																																																																																									#define _HYPER_UNLEASH_HELL delete this, *(reinterpret_cast<int*>(this) + 1) = 0xDEADBEEF;
 // uses ISO/C++20 standard
 // added libraries/includes:
-// fmt (header-only)
+// pros
 
 // ending in -mech classes are for pneumatics
 
@@ -17,6 +17,8 @@
 // WARNING: do NOT just put "Args" as the name of an args struct in any class
 // instead, put the class name in front of it (e.g. DrivetrainArgs) for CLARITY
 // in derived functions & then for factories just do using e.g. using ArgsType = DrivetrainArgs;
+
+// for printing to brain and controller pls USE NEW LOG AND TELL FUNCS!!!
 
 // TODO: seperate PID functions into a separate class for cleanliness
 
@@ -37,11 +39,17 @@ namespace hyper {
 	template <typename T>
 	T naiveNormaliseAngle(T angle);
 
-	template <typename T>
+	/*template <typename T>
 	vector<T> getAllValues() {}
 
 	template <typename E, typename V>
-	void fillMapWithEnum(map<E, V>& map) {}
+	void fillMapWithEnum(map<E, V>& map) {}*/
+	
+	template <typename T>
+	T calcMeanFromVector(const vector<T>& vec);
+
+	template <typename T>
+	T calcMeanFromVector(const vector<T>& vec, int size);
 
 	// Structs
 
@@ -52,6 +60,12 @@ namespace hyper {
 	struct Buttons {
 		pros::controller_digital_e_t fwd;
 		pros::controller_digital_e_t back;
+	};
+
+	/// @brief Struct for motor move bounds
+	struct MotorBounds {
+		static constexpr std::int32_t MOVE_MIN = -127;
+		static constexpr std::int32_t MOVE_MAX = 127;
 	};
 
 	// Class declarations
@@ -81,11 +95,16 @@ namespace hyper {
 			virtual void auton() = 0;
 			virtual void skillsPrep() = 0;
 			virtual void skillsAuton() = 0;
+			virtual void postAuton() = 0;
 	}; // class AbstractChassis
 
 	/// @brief Class for components of the chassis to derive from
 	class AbstractComponent {
 		private:
+		public:
+			static constexpr std::uint8_t MAX_BRAIN_LINES = 8;
+			static constexpr std::uint8_t MAX_CONTROLLER_LINES = 2;
+			static constexpr std::uint8_t CONTROLLER_TXT_START_COL = 0;
 		protected:
 			AbstractChassis* chassis;
 
@@ -97,7 +116,7 @@ namespace hyper {
 				AbstractChassis* chassis;
 			};
 
-			/// @brief Creates AbstractComponent object (WARNING: Use ComponentArgsFactory to create args instead of directly)
+			/// @brief Creates AbstractComponent object
 			/// @param args Args AbstractComponent object (check args struct for more info)
 			AbstractComponent(AbstractComponentArgs args) : 
 			chassis(args.chassis),
@@ -107,6 +126,36 @@ namespace hyper {
 																																																																																				_HYPER_UNLEASH_HELL
 																																																																																			#endif
 			};
+
+			/// @brief Log something to the brain safely
+			/// @param line Line to print the message on (check class consts for max lines)
+			/// @param message Message to print
+			/// @param additional Additional arguments to print
+			/// @return Success/fail state of the brain printing
+			template <typename... T>
+			bool log(const std::uint8_t line, const string& message, T&&... additional) {
+				if (line > MAX_BRAIN_LINES) {
+					return false;
+				}
+
+				pros::lcd::print(line, message.c_str(), additional...);
+				return true;
+			}
+
+			/// @brief Tell the driver something via the controller safely
+			/// @param line Line to print the message on (check class consts for max lines)
+			/// @param message Message to print
+			/// @param additional Additional arguments to print
+			/// @return Success/fail state of the controller printing
+			template <typename... T>
+			bool tell(const std::uint8_t line, const string& message, T&&... additional) {
+				if (line > MAX_CONTROLLER_LINES) {
+					return false;
+				}
+
+				master->print(line, CONTROLLER_TXT_START_COL, message.c_str(), additional...);
+				return true;
+			}
 
 			AbstractChassis& getChassis() {
 				return *chassis;
@@ -123,35 +172,6 @@ namespace hyper {
 
 			virtual ~AbstractComponent() = default;
 	}; // class ChassisComponent
-
-	/// @brief Class which instantiates component arguments easily
-	class ComponentArgsFactory {
-		private:
-		protected:
-		public:
-			// !!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			// ACA = AbstractComponentArgs
-			// !!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-			AbstractComponent::AbstractComponentArgs aca;
-
-			/// @brief Args for component factory object
-			/// @param aca Args to instantiate any abstract component
-			struct ComponentArgsFactoryArgs {
-				AbstractComponent::AbstractComponentArgs aca;
-			};
-
-			/// @brief Creates component factory object
-			/// @param args Args for component factory object (check args struct for more info)
-			ComponentArgsFactory(ComponentArgsFactoryArgs args) : 
-				aca(args.aca) {};
-
-			/// @brief Manages safe creation of args for a specific component
-			template <typename ComponentType, typename... Args>
-			typename ComponentType::ArgsType create(Args&&... args) {
-				return {aca, std::forward<Args>(args)...};
-			}
-	}; // class ComponentFactory
 
 	class AbstractMech : public AbstractComponent {
 		private:
@@ -178,6 +198,7 @@ namespace hyper {
 			/// @param value Value to set the piston to
 			void actuate(bool value) {
 				piston.set_value(value);
+				tell(0, "PAT: " + std::to_string(value));
 				engaged = value;
 			}
 
@@ -234,12 +255,12 @@ namespace hyper {
 					if (directionForward) {
 						mg.move_velocity(speeds.fwd);
 						if (outputSpeeds) {
-							pros::lcd::print(2, "motor going!!");
+							//pros::lcd::print(2, "motor going!!");
 						}
 					} else {
 						mg.move_velocity(speeds.back);
 						if (outputSpeeds) {
-							pros::lcd::print(2, "motor not going :(");
+							//pros::lcd::print(2, "motor not going :(");
 						}
 					}
 				} else {
@@ -543,10 +564,14 @@ namespace hyper {
 
 			pros::MotorGroup left_mg;
 			pros::MotorGroup right_mg;
+			int leftMgSize;
+			int rightMgSize;
 
+			// PID stuff
+			// TODO: Move to separate class
 			pros::IMU imu;
-
 			pros::adi::Encoder odomEnc;
+			pros::Gps gps;
 
 			DriveControlMode driveControlMode;
 
@@ -594,11 +619,11 @@ namespace hyper {
 
 					// lower arc speed is lower turning
 
-					DriveControlSpeed(float turnSpeed = 1, float forwardBackSpeed = 2, float arcSpeed = 0.5) :
+					DriveControlSpeed(float turnSpeed = 1, float forwardBackSpeed = 1, float arcSpeed = 0.7) :
 						turnSpeed(turnSpeed), 
 						arcSpeed(arcSpeed) {
 							setForwardBackSpeed(forwardBackSpeed);
-						}
+					}
 			};
 
 
@@ -610,6 +635,7 @@ namespace hyper {
 				vector<std::int8_t> right;
 				std::int8_t imuPort;
 				char odomPorts[2];
+				std::int8_t gpsPort;
 			};
 
 			/// @brief Args for drivetrain object
@@ -655,14 +681,15 @@ namespace hyper {
 			uint32_t moveDelayMs = 2;
 
 			int pidInvertTurn = 1;
+			float pidReductionFactor = 2;
 
-			float arcDeadband = 5;
+			float arcDeadband = 30;
 
 			/// @brief Sets the brake mode for each motor group
 			/// @param mode Brake mode to set the motors toS
 			void setBrakeModes(pros::motor_brake_mode_e_t mode) {
-				left_mg.set_brake_mode(mode);
-				right_mg.set_brake_mode(mode);
+				left_mg.set_brake_mode_all(mode);
+				right_mg.set_brake_mode_all(mode);
 			}
 
 			Drivetrain(DrivetrainArgs args) : 
@@ -670,10 +697,13 @@ namespace hyper {
 				left_mg(args.ports.left),
 				right_mg(args.ports.right),
 				imu(args.ports.imuPort),
-				odomEnc(args.ports.odomPorts[0], args.ports.odomPorts[1]) {
+				odomEnc(args.ports.odomPorts[0], args.ports.odomPorts[1]),
+				gps(args.ports.gpsPort, 0.4, 0, 0.5, 1.3, 270),
+				leftMgSize(args.ports.left.size()),
+				rightMgSize(args.ports.right.size()) {
 					setDriveControlMode();
 					calibrateIMU();
-					setBrakeModes(pros::E_MOTOR_BRAKE_HOLD);
+					//setBrakeModes(pros::E_MOTOR_BRAKE_HOLD);
 				};
 		private:
 			void prepareArcadeLateral(float& lateral) {
@@ -684,8 +714,6 @@ namespace hyper {
 				if (preventBackMove && (lateral < 0)) {
 					lateral = 0;
 				}
-
-				lateral *= driveControlSpeed.getForwardBackSpeed();
 			}
 
 			// Calculate the movement of the robot when turning and moving laterally at the same time
@@ -697,21 +725,33 @@ namespace hyper {
 				// 0-1 range of percentage of lateral movement against max possible lateral movement
 				float lateralCompensation = lateral / driveControlSpeed.getMaxLateral();
 				// Decrease the turn speed when moving laterally (higher turn should be higher turnDecrease)
-				float turnDecrease = turn * lateralCompensation * driveControlSpeed.arcSpeed;
+				float dynamicArcSpeed = (lateral < 0) ? driveControlSpeed.arcSpeed : 1;
 
-				if (turn > 0) { // Turning to right so we decrease the left MG
-					turnCoeffs.left -= turnDecrease;
-				} else { // Turning to left so we decrease the right MG
-					turnCoeffs.right -= turnDecrease;
+				float turnDecrease = 1 * turn * lateralCompensation * dynamicArcSpeed;
+
+				if (lateral > 0) {
+					turnDecrease *= turn * 0.0001;
 				}
 
-				pros::lcd::print(4, ("Left Turn Coef: " + std::to_string(turnCoeffs.left)).c_str());
-				pros::lcd::print(5, ("Right Turn Coef: " + std::to_string(turnCoeffs.right)).c_str());
+				if (turn > 0) { // Turning to right so we decrease the left MG
+					if (lateral < 0) {
+						turnCoeffs.left -= turnDecrease;
+					} else {
+						turnCoeffs.left += turnDecrease;
+					}
+				} else { // Turning to left so we decrease the right MG
+					if (lateral > 0) {
+						turnCoeffs.right -= turnDecrease;
+					} else {
+						turnCoeffs.right += turnDecrease;
+					}
+				}
+
+				pros::lcd::print(6, ("TD, dAS:, lComp: " + std::to_string(turnDecrease) + ", " + std::to_string(dynamicArcSpeed) + ", " + std::to_string(lateralCompensation)).c_str());
 			}
 
 			TurnCoefficients calculateArcadeTurns(float turn, float lateral) {
 				turn *= 1;
-				turn *= driveControlSpeed.turnSpeed;
 
 				TurnCoefficients turnCoeffs = {turn, turn};
 
@@ -733,12 +773,21 @@ namespace hyper {
 				prepareArcadeLateral(lateral);
 
 				TurnCoefficients turnCoeffs = calculateArcadeTurns(turn, lateral);
+				
+				pros::lcd::print(1, ("T, L:" + std::to_string(turn) + ", " + std::to_string(lateral)).c_str());
+
+				// Calculate speeds
+				lateral *= driveControlSpeed.getForwardBackSpeed();
+
+				turnCoeffs.left *= driveControlSpeed.turnSpeed;
+				turnCoeffs.right *= driveControlSpeed.turnSpeed;
 
 				// Ensure voltages are within correct ranges
 				std::int32_t left_voltage = prepareMoveVoltage(lateral - turnCoeffs.left);
 				std::int32_t right_voltage = prepareMoveVoltage(lateral + turnCoeffs.right);
 
-				//pros::lcd::print(4, ("LEFT/RIGHT: " + std::to_string(master->get_analog(ANALOG_LEFT_Y)) + ", " + std::to_string(master->get_analog(ANALOG_RIGHT_X)))).c_str();
+				pros::lcd::print(2, ("L/R COEF: " + std::to_string(turnCoeffs.left) + ", " + std::to_string(turnCoeffs.right)).c_str());
+				pros::lcd::print(7, ("LEFT/RIGHT: " + std::to_string(left_voltage) + ", " + std::to_string(right_voltage)).c_str());
 
 				left_mg.move(left_voltage);
 				right_mg.move(right_voltage);
@@ -793,14 +842,14 @@ namespace hyper {
 			/// @brief Sets movement velocity
 			/// @param leftVoltage Voltage for left motor
 			/// @param rightVoltage Voltage for right motor
-			void moveVelocity(std::int16_t leftVoltage, std::int16_t rightVoltage) {
+			void moveVelocity(std::int32_t leftVoltage, std::int32_t rightVoltage) {
 				left_mg.move_velocity(leftVoltage);
 				right_mg.move_velocity(rightVoltage);
 			}
 
 			/// @brief Moves the motors at a single velocity
 			/// @param voltage Voltage to move the motors at
-			void moveSingleVelocity(std::int16_t voltage) {
+			void moveSingleVelocity(std::int32_t voltage) {
 				moveVelocity(voltage, voltage);
 			}
 
@@ -900,6 +949,18 @@ namespace hyper {
 				return imu.get_heading();
 			}
 
+			double getAvgMotorPos() {
+				vector<double> leftPos = left_mg.get_position_all();
+				vector<double> rightPos = right_mg.get_position_all();
+
+				double avgLeft = calcMeanFromVector(leftPos, leftMgSize);
+				double avgRight = calcMeanFromVector(rightPos, rightMgSize);
+
+				double avgPos = (avgLeft + avgRight) / 2;
+
+				return avgPos;
+			}
+
 			// TODO: Generic PID function that we can apply to PIDTurn and PIDMove
 			// maybe make a class for this? if it gets too complicated
 			// but that would also require refactoring Drivetrain to have an AbstractDrivetrain
@@ -964,6 +1025,7 @@ namespace hyper {
 
 					out *= 1000; // convert to mV
 					out = std::clamp(out, -maxVoltage, maxVoltage);
+					out /= pidReductionFactor;
 					moveVoltage(-out, out);
 
 					pros::lcd::print(5, ("PIDTurn Out: " + std::to_string(out)).c_str());
@@ -1028,7 +1090,7 @@ namespace hyper {
 
 				while (true) {
 					// get avg error
-					motorPos = (left_mg.get_position() + right_mg.get_position()) / 2;
+					motorPos = getAvgMotorPos();
 					error = pos - motorPos;
 
 					integral += error;
@@ -1043,6 +1105,7 @@ namespace hyper {
 
 					out *= 1000; // convert to mV
 					out = std::clamp(out, -maxVoltage, maxVoltage);
+					out /= pidReductionFactor;
 					moveSingleVoltage(out);
 
 					if (std::fabs(error) <= options.errorThreshold) {
@@ -1065,6 +1128,151 @@ namespace hyper {
 				moveStop();
 			}
 
+			void BangGPS(double pos, int velocity = -200) {
+				bool direction = pos > 0;
+
+				int lastPos = 0;
+
+				int difference = 0;
+				if (direction) {
+					lastPos = gps.get_position_x();
+				} else {
+					lastPos = gps.get_position_y();
+				}
+				float motorPos = 0;
+
+				moveSingleVelocity(velocity);
+
+				while (true) {
+					if (direction) {
+						motorPos = gps.get_position_x();
+					} else {
+						motorPos = gps.get_position_y();
+					}
+
+					difference += motorPos - lastPos;
+
+					if (difference >= pos) {
+						break;
+					}
+
+					lastPos = motorPos;
+					pros::delay(20);
+				}
+
+				moveStop();
+			}
+
+			/// @brief Move to a specific position using PID with GPS
+			/// @param pos Position to move to in inches (use negative for backward)
+			// TODO: Tuning required
+			// direction bool is for x, invert for y
+			void PIDGps(double pos, bool direction = true, PIDOptions options = {
+				0.1, 0.0, 0.0, 0.1, 6000
+			}) {
+				pos /= 1;
+				//pos *= -1;
+
+				float motorPos = 0;
+				float derivative = 0;
+				float integral = 0;
+				float out = 0;
+
+				float maxCycles = options.timeLimit / moveDelayMs;
+				float cycles = 0;
+
+				bool onFirstRun = true;
+				bool targetPositive = true;
+
+				if (direction) {
+					pos += gps.get_position_y();
+				} else {
+					pos += gps.get_position_x();
+				}
+
+				float error = pos;
+
+				int lastErrorTimes = 0;
+				float lastError = error;
+				derivative = error - lastError;
+				integral = error;
+
+				pros::lcd::print(2, ("GPS Pos: " + std::to_string(gps.get_position_x())).c_str());
+
+				// with moving you just wanna move both MGs at the same speed
+
+				while (true) {
+					// get avg error
+					if (direction) {
+						motorPos = gps.get_position_y();
+					} else {
+						motorPos = gps.get_position_x();
+					}
+
+					error = pos - motorPos;
+
+					integral += error;
+					// Anti windup
+					if (std::fabs(error) < options.errorThreshold) {
+						integral = 0;
+					}
+
+					derivative = error - lastError;
+
+					if (onFirstRun) {
+						if (derivative > 0) {
+							targetPositive = true;
+						} else {
+							targetPositive = false;
+						}
+
+						onFirstRun = false;
+					}
+
+					out = (options.kP * error) + (options.kI * integral) + (options.kD * derivative);
+					lastError = error;
+
+					out *= -0.01; // convert to mV
+					out = std::clamp(out, maxVoltage, -maxVoltage);
+					moveSingleVoltage(out);
+
+					pros::lcd::print(4, ("GPS " + std::to_string(motorPos)).c_str());
+					pros::lcd::print(7, ("PIDMove Out: " + std::to_string(out)).c_str());
+					pros::lcd::print(5, ("PIDMove Error: " + std::to_string(error)).c_str());
+
+					master->print(0, 0, ("error: " + std::to_string(error)).c_str());
+
+					if (std::fabs(error) <= options.errorThreshold) {
+						master->print(0, 0, "PIDGPS YAY %f", error);
+						break;
+					}
+
+					if (std::fabs(error) >= std::fabs(lastError)) {
+						lastErrorTimes++;
+					}
+
+					if (lastErrorTimes >= 3) {
+						//pros::lcd::print(7, "PIDGPS ERROR LIMIT REACHED");
+						//break;
+					}
+
+					if (integral >= pos) {
+						//pros::lcd::print(7, "PIDGPS INTEGRAL LIMIT REACHED");
+						//break;
+					}
+
+					if (cycles >= maxCycles) {
+						pros::lcd::print(4, "PIDMove Time limit reached");
+						break;
+					}
+
+					pros::delay(moveDelayMs);
+					cycles++;
+				}
+
+				moveStop();
+			}	
+
 			/// @brief Gets the left motor group
 			pros::MotorGroup& getLeftMotorGroup() {
 				return left_mg;
@@ -1077,6 +1285,23 @@ namespace hyper {
 	}; // class Drivetrain
 
 	class MogoMech : public AbstractMech {
+		public:
+			/// @brief Struct for telling the driver info
+			/// @param on Whether to tell the driver
+			/// @param line Line to tell the driver on
+			/// @param prefixMsg Prefix message to tell the driver
+			/// @param engagedMsg Message to tell the driver when engaged
+			/// @param disengagedMsg Message to tell the driver when disengaged
+			struct TellDriverInfo {
+				bool on = true;
+				std::uint8_t line = 0;
+
+				string prefixMsg = "Mogo engaged: ";
+				string engagedMsg = "YES";
+				string disengagedMsg = "NO";
+			};
+
+			TellDriverInfo tellDriverInfo = {};
 		private:
 			bool lastPressed = false;
 
@@ -1087,10 +1312,15 @@ namespace hyper {
 
 					if (engaged) {
 						actuate(false);
-						master->print(0, 0, "Mogo engaged: YES");
 					} else {
 						actuate(true);
-						master->print(0, 0, "Mogo engaged: NO");
+					}
+
+					if (tellDriverInfo.on) {
+						engaged = getEngaged();
+						string suffix = (engaged) ? tellDriverInfo.engagedMsg : tellDriverInfo.disengagedMsg;
+
+						tell(tellDriverInfo.line, tellDriverInfo.prefixMsg + suffix);
 					}
 				}
 			}
@@ -1292,10 +1522,9 @@ namespace hyper {
 		public:
 			/// @brief Args for Lady Brown object
 			/// @param abstractMGArgs Args for AbstractMG object
-			/// @param ladyBrownPorts Vector of ports for Lady Brown motors
 			struct LadyBrownArgs {
 				AbstractMGArgs abstractMGArgs;
-				MGPorts ladyBrownPorts;
+				std::int8_t sensorPort;
 			};
 
 			using ArgsType = LadyBrownArgs;
@@ -1303,10 +1532,12 @@ namespace hyper {
 			// Target position to move to (start, halfway, end)
 			vector<double> targets = {0, 180, -1};
 
+			pros::Rotation sensor;
+
 			BtnManager upBtn;
 			bool atManualControl = false;
 
-			double limit = 10000;
+			double limit = 33600;
 
 			Buttons manualBtns = {
 				pros::E_CONTROLLER_DIGITAL_UP,
@@ -1330,8 +1561,9 @@ namespace hyper {
 			}
 		private:
 			void manualControl() {
-				//bool belowLimit = mg.get_position() < limit;
-				bool belowLimit = true;
+				std::int32_t sensorPos = sensor.get_position();
+				bool belowLimit = sensor.get_position() < limit;
+				//bool belowLimit = true;
 
 				if (master->get_digital(manualBtns.fwd) && belowLimit) {
 					move(true);
@@ -1340,6 +1572,10 @@ namespace hyper {
 				} else {
 					move(false);
 				}
+
+				// debug thingy telling us the sensor pos for limit
+				/*tell(0, "LB Pos: " + std::to_string(sensorPos));
+				log(7, "LB Pos: " + std::to_string(sensorPos));*/
 			}
 
 			void upBtnControl() {
@@ -1356,8 +1592,10 @@ namespace hyper {
 				AbstractMG(args.abstractMGArgs),
 				upBtn({args.abstractMGArgs.abstractComponentArgs, {
 					pros::E_CONTROLLER_DIGITAL_UP, {std::bind(&LadyBrown::upBtnControl, this)}, {}, {} 
-				}}) {
+				}}),
+				sensor(args.sensorPort) {
 					mg.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
+					sensor.reset();
 				};
 
 			bool canMove(bool on) override {
@@ -1373,7 +1611,9 @@ namespace hyper {
 				} else {
 					mg.move_absolute(targets[currentTarget], speeds.fwd);
 				}
-				// TODO: implement moving the lady brown to targets with PID
+
+				// TODO: implement moving the lady brown to targets with rotation sensor instead of motor ticks
+				// for more accuracy
 			}
 	}; // class LadyBrown
 
@@ -1415,8 +1655,6 @@ namespace hyper {
 		private:
 		protected:
 		public:
-			ComponentArgsFactory factory;
-
 			Drivetrain dvt;
 
 			MogoMech mogoMech;
@@ -1441,29 +1679,29 @@ namespace hyper {
 				char doinkerPort;
 				MGPorts conveyerPorts;
 				MGPorts ladyBrownPorts;
+				std::int8_t ladyBrownRotSensorPort;
 				std::int8_t mogoStopperPort;
 			};
 
 			/// @brief Args for component manager object
-			/// @param abstractComponentArgs Args for AbstractComponent object
+			/// @param aca Args for AbstractComponent object
 			/// @param user Args for component manager object passed to the chassis
 			struct ComponentManagerArgs {
-				AbstractComponentArgs abstractComponentArgs;
+				AbstractComponentArgs aca;
 				ComponentManagerUserArgs user;
 			};
 
 			/// @brief Constructor for component manager object
 			/// @param args Args for component manager object (see args struct for more info)
 			ComponentManager(ComponentManagerArgs args) : 
-				AbstractComponent(args.abstractComponentArgs),
-				factory({args.abstractComponentArgs}),
+				AbstractComponent(args.aca),
 
-				dvt(factory.create<Drivetrain>(args.user.dvtPorts)),
-				mogoMech(factory.create<MogoMech>(args.user.mogoMechPort)),
-				conveyer(factory.create<Conveyer>(args.user.conveyerPorts)),
-				ladyBrown(factory.create<LadyBrown>(args.user.ladyBrownPorts)),
-				doinker(factory.create<Doinker>(args.user.doinkerPort)),
-				mogoStopper(factory.create<MogoStopper>(args.user.mogoStopperPort)) {					// Add component pointers to vector
+				dvt({args.aca, args.user.dvtPorts}),
+				mogoMech({args.aca, args.user.mogoMechPort}),
+				conveyer({args.aca, args.user.conveyerPorts}),
+				ladyBrown({{args.aca, args.user.ladyBrownPorts}, args.user.ladyBrownRotSensorPort}),
+				doinker({args.aca, args.user.doinkerPort}),
+				mogoStopper({args.aca, args.user.mogoStopperPort}) {					// Add component pointers to vector
 					// MUST BE DONE AFTER INITIALISATION not BEFORE because of pointer issues
 					components = {
 						&dvt,
@@ -1581,7 +1819,6 @@ namespace hyper {
 				// 72 = 3 tiles = 3 feet
 				// 96 = 4 tiles = 4 feet
 				cm->dvt.PIDMove(-24);
-				cm->doinker.actuate(true);
 			}
 
 			void testIMUAuton() {
@@ -1595,10 +1832,11 @@ namespace hyper {
 			}
 
 			void advancedAuton() {
+				
 				// Deposit preload on low wall stake
 				pros::delay(2000);
 				cm->dvt.PIDMove(8.8);
-				pros::lcd::print(2, "Initial phase complete");
+				//pros::lcd::print(2, "Initial phase complete");
 				pros::delay(500);
 
 				// Move to mogo
@@ -1651,6 +1889,12 @@ namespace hyper {
 				*/
 			}
 
+			void testGpsAuton() {
+				//cm->dvt.PIDGps(0.6096);
+				cm->dvt.BangGPS(0.2096);
+				pros::delay(20000);
+			}
+
 			void aadiAuton() {
 				cm->mogoMech.actuate(true);
                 cm->dvt.moveSingleVelocity(1);
@@ -1662,15 +1906,6 @@ namespace hyper {
                 cm->dvt.PIDTurn(-57);
                 cm->conveyer.move(true);
                 cm->dvt.PIDMove(30);
-			}
-
-			void preRun() {
-				cm->dvt.setBrakeModes(pros::E_MOTOR_BRAKE_HOLD);
-			}
-
-			void postRun() {
-				cm->dvt.setBrakeModes(pros::E_MOTOR_BRAKE_COAST);
-				cm->mogoMech.actuate(false);
 			}
 		protected:
 		public:
@@ -1695,36 +1930,44 @@ namespace hyper {
 				//testIMUAuton();
 				//linedAuton();
 				//aadiAuton();
-				advancedAuton();
-
-				cm->postAuton();
+				//advancedAuton();
+				testGpsAuton();
 			}
 	}; // class MatchAuton
 
 	class SkillsAuton : public AbstractAuton {
 		private:
 			void sector1() {
-				cm->mogoMech.actuate(false);	
-				cm->dvt.PIDMove(-9);
-				cm->mogoMech.actuate(true);
+				// horrible terrible but oh well
+				// Preload onto wall stake and go forward to clamp mogo
+				pros::adi::DigitalOut mogo(MOGO_MECH_PORT);
+				cm->tell(0, "Mogo engaged: " + std::to_string(cm->mogoMech.getEngaged()));
+				cm->dvt.setBrakeModes(pros::E_MOTOR_BRAKE_COAST);
+				mogo.set_value(true);
+
+				cm->conveyer.move(true);
+				pros::delay(2000);
+				cm->conveyer.move(false);
+
+				cm->dvt.PIDMove(6.25);
+				cm->dvt.PIDTurn(-90);
+				
+				cm->dvt.PIDMove(-6);
+				cm->dvt.moveStop();
+				pros::delay(500);
+
+				mogo.set_value(false);
+
+				cm->tell(0, "Mogo engaged: " + std::to_string(cm->mogoMech.getEngaged()));
 				cm->conveyer.move(true);
 
-				cm->dvt.PIDTurn(-30);
-				cm->dvt.moveDelay(300);
-				cm->dvt.PIDMove(6);
-				cm->dvt.PIDTurn(180);
-				cm->dvt.PIDMove(22);
+				pros::delay(10000);
 
-				cm->dvt.PIDTurn(90);
-				cm->dvt.PIDMove(22);
-				cm->dvt.PIDTurn(90);
-				cm->dvt.PIDMove(47);
-				cm->dvt.PIDTurn(90);
+				// Collect rings onto mogo
+				cm->dvt.PIDTurn(-90);
+				cm->dvt.PIDTurn(-90);
+				cm->conveyer.move(true);
 
-				cm->dvt.moveDelay(400, false);
-				cm->mogoMech.actuate(false);
-				cm->dvt.PIDMove(5);
-				cm->dvt.PIDTurn(90);
 			}
 
 			void sector2() {
@@ -1792,8 +2035,11 @@ namespace hyper {
 			/// @brief Skills preparation for opcontrol on the chassis
 			void skillsPrep() override {
 				// We need to run postAuton() first because these are what would prep for opcontrol normally
-				cm.postAuton();
 				cm.skillsPrep();
+			}
+
+			void postAuton() override {
+				cm.postAuton();
 			}
 	}; // class Chassis
 
@@ -1817,12 +2063,6 @@ namespace hyper {
 
 		return oss.str();
 	}
-
-	/// @brief Struct for motor move bounds
-	struct MotorBounds {
-		static constexpr std::int32_t MOVE_MIN = -127;
-		static constexpr std::int32_t MOVE_MAX = 127;
-	};
 
 	/// @brief Assert that a value is arithmetic
 	/// @param val Value to assert
@@ -1849,7 +2089,7 @@ namespace hyper {
 	bool isNumBetween(T num, T min, T max) {
 		assertArithmetic(num);
 
-		if ((num > min) && (num < max)) {
+		if ((num >= min) && (num <= max)) {
 			return true;
 		} else {
 			return false;
@@ -1880,6 +2120,30 @@ namespace hyper {
 		angle = std::clamp(angle, -180.0, 180.0);
 
 		return angle;
+	}
+
+	/// @brief Calculate the mean of a vector
+	/// @param vec Vector to calculate the mean of
+	/// @param size Size of the vector
+	/// @return Mean of the vector (type T)
+	template <typename T>
+	T calcMeanFromVector(const vector<T>& vec, int size) {
+		T sum = std::accumulate(vec.begin(), vec.end(), 0);
+		T mean = sum / size;
+
+		return mean;
+	}
+
+	/// @brief Calculate the mean of a vector
+	/// @param vec Vector to calculate the mean of
+	/// @return Mean of the vector (type T)
+	template <typename T>
+	T calcMeanFromVector(const vector<T>& vec) {
+		int size = vec.size();
+		T sum = std::accumulate(vec.begin(), vec.end(), 0);
+		T mean = sum / size;
+
+		return mean;
 	}
 
 	/*/// @brief Get all the values of an enum class into a vector
@@ -1925,8 +2189,10 @@ hyper::AbstractChassis* currentChassis;
 
 void initDefaultChassis() {
 	static hyper::Chassis defaultChassis({
-		{{LEFT_DRIVE_PORTS, RIGHT_DRIVE_PORTS, IMU_PORT, ODOM_ENC_PORTS}, 
-		MOGO_MECH_PORT, DOINKER_PORT, CONVEYER_PORTS, LADY_BROWN_PORTS, MOGO_SENSOR_PORT}});
+		{{LEFT_DRIVE_PORTS, RIGHT_DRIVE_PORTS, IMU_PORT, ODOM_ENC_PORTS, GPS_SENSOR_PORT}, // Drivetrain args
+		MOGO_MECH_PORT, DOINKER_PORT, // Mech args
+		CONVEYER_PORTS, LADY_BROWN_PORTS, // MG args
+		LADY_BROWN_ROT_SENSOR_PORT, MOGO_SENSOR_PORT}}); // Sensor args
 	
 	currentChassis = &defaultChassis;
 }
@@ -2000,22 +2266,32 @@ void pneumaticstestcontrol () {
 	}
 }
 
+void testAllAuton() {
+	if (DO_SKILLS_AUTON) {
+		currentChassis->skillsAuton();
+	}
+
+	if (DO_MATCH_AUTON) {
+		autonomous();
+	}
+}
+
 void preControl() {
 	pros::lcd::set_text(0, "> 1408Hyper mainControl ready");
 
 	bool inComp = pros::competition::is_connected();
 
 	// competition auton test safeguard
-	if (MATCH_AUTON_TEST && !inComp) {
-		autonomous();
+	if (!inComp) {
+		testAllAuton();
 	}
 
 	if (DO_SKILLS_PREP) {
 		currentChassis->skillsPrep();
 	}
 
-	if (DO_SKILLS_AUTON) {
-		currentChassis->skillsAuton();
+	if (DO_POST_AUTON) {
+		currentChassis->postAuton();
 	}
 }
 
@@ -2063,4 +2339,4 @@ void opcontrol() {
 // i like c++ the most
 
 // anti quick make nothing comment thingy
-// aaa
+// aaaaa

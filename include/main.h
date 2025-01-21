@@ -38,10 +38,15 @@
 
 // Includes
 //#include "okapi/api.hpp"
+// Vectors to contain data
 #include <vector>
+// Strings for better char arrays
 #include <string>
+// Intializer lists
 #include <initializer_list>
+// Streams for better IO
 #include <sstream>
+// Memory management
 #include <memory>
 // Perfect forwarding
 #include <utility>
@@ -59,8 +64,10 @@
 #include <cstdlib>
 // Mapping dictionary
 #include <map>
-// Type traits
-#include <type_traits>
+// Numbers
+#include <numeric>
+// Execution
+#include <execution>
 
 // fmt is gone
 

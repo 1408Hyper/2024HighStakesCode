@@ -5,8 +5,6 @@
 
 // Variables (u can change these!!)
 #define MAINLOOP_DELAY_TIME_MS 20
-// Turn on for match auton to be run at the start of opcontrol
-#define MATCH_AUTON_TEST true
 
 #define CURRENT_OPCONTROL mainControl
 
@@ -37,16 +35,26 @@
 #define DIST_SENSOR_PORT 16
 
 // Port for the mogo sensor
-#define MOGO_SENSOR_PORT 9
+#define MOGO_SENSOR_PORT 17
+
+#define LADY_BROWN_ROT_SENSOR_PORT 9
+
+//Port for the GPS Sensor
+#define GPS_SENSOR_PORT 2
 
 // Ports for telemetry
 // IMU
 #define IMU_PORT 12
 
 // Turn on/off auton and opcontrol
-#define DO_MATCH_AUTON true
+#define DO_MATCH_AUTON false
+#define DO_SKILLS_AUTON true
+
+// Turn on for match auton to be run at the start of opcontrol
+#define MATCH_AUTON_TEST false
+
 #define DO_SKILLS_PREP true
-#define DO_SKILLS_AUTON false
+#define DO_POST_AUTON false
 #define DO_OP_CONTROL true
 
 // Ports for the drivetrain motors
