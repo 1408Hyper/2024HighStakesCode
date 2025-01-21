@@ -1,4 +1,4 @@
-![1408Hyper 2024-25 repo banner](https://raw.githubusercontent.com/helloworld3200/1408Hyper-2024VRC-Code/main/readme-assets/banner1.png)
+![1408Hyper 2024-25 repo banner](https://raw.githubusercontent.com/1408Hyper/creative-assets/refs/heads/main/logos/final/SWED/2024HighStakesCode%20Banner%202%20Light%20Only.PNG)
 
 <center><h1> ⚡<em><strong>1408H</em></strong>yper @ VRC 2024-25</center></h1>
 
@@ -8,7 +8,7 @@
 
 ### Sponsored by [Teehee Dental Works](https://teehee.sg/)
 
-**1408Hyper-2024VRC-Code** was designed with portability in mind - we understand that situations can quickly change at any competition.  
+**2024HighStakesCode** was designed with portability in mind - we understand that situations can quickly change at any competition.  
 
 Our code is hot-swappable, making heavy use of **abstract classes** and **templates**
 to allow for us to rapidly change and test different pieces of code when time is of the essence.
