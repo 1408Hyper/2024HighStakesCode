@@ -198,7 +198,6 @@ namespace hyper {
 			/// @param value Value to set the piston to
 			void actuate(bool value) {
 				piston.set_value(value);
-				tell(0, "PAT: " + std::to_string(value));
 				engaged = value;
 			}
 
@@ -919,8 +918,8 @@ namespace hyper {
 			/// @brief Turn to a specific angle with a delay
 			/// @param angle Angle to turn to
 			/// @param delayMs Delay in milliseconds
-			void turnDelay(bool direction, std::uint32_t delayMs) {
-				std::int16_t turnDirection = (direction) ? maxTurnVelocity : -maxTurnVelocity;
+			void turnDelay(bool direction, std::uint32_t delayMs, std::int16_t delayTurnVelocity = 60) {
+				std::int16_t turnDirection = (direction) ? delayTurnVelocity : -delayTurnVelocity;
 
 				left_mg.move_velocity(turnDirection);
 				right_mg.move_velocity(-turnDirection);
@@ -934,11 +933,11 @@ namespace hyper {
 			/// @param delayMs Number of milliseconds to move forward
 			/// @param left Whether to move the left motor
 			/// @param right Whether to move the right motor
-			void moveDelay(std::uint32_t delayMs, bool forward = true) {
+			void moveDelay(std::uint32_t delayMs, bool forward = true, std::int16_t delayMoveVelocity = 60) {
 				if (forward) {
-					moveSingleVelocity(-defaultMoveVelocity);
+					moveSingleVelocity(-delayMoveVelocity);
 				} else {
-					moveSingleVelocity(defaultMoveVelocity);
+					moveSingleVelocity(delayMoveVelocity);
 				}
 
 				pros::delay(delayMs);
@@ -973,7 +972,7 @@ namespace hyper {
 			/// @brief Turn to a specific angle using PID
 			/// @param angle Angle to move to (PASS IN THE RANGE OF -180 TO 180 for left and right)
 			// TODO: Tuning required
-			void PIDTurn(double angle, PIDOptions options = {
+			void PIDTurn(double angle, float reductionFactor = 2, PIDOptions options = {
 				0.3, 0.0, 0.7, 1, 6000
 			}) {
 				imu.tare();
@@ -1066,7 +1065,7 @@ namespace hyper {
 			/// @brief Move to a specific position using PID
 			/// @param pos Position to move to in inches (use negative for backward)
 			// TODO: Tuning required
-			void PIDMove(double pos, PIDOptions options = {
+			void PIDMove(double pos, float reductionFactor = 2, PIDOptions options = {
 				0.15, 0.0, 0.6, 3, 6000
 			}) {
 				// TODO: Consider adding odometry wheels as the current motor encoders
@@ -1930,8 +1929,8 @@ namespace hyper {
 				//testIMUAuton();
 				//linedAuton();
 				//aadiAuton();
-				//advancedAuton();
-				testGpsAuton();
+				advancedAuton();
+				//testGpsAuton();
 			}
 	}; // class MatchAuton
 
@@ -1941,7 +1940,6 @@ namespace hyper {
 				// horrible terrible but oh well
 				// Preload onto wall stake and go forward to clamp mogo
 				pros::adi::DigitalOut mogo(MOGO_MECH_PORT);
-				cm->tell(0, "Mogo engaged: " + std::to_string(cm->mogoMech.getEngaged()));
 				cm->dvt.setBrakeModes(pros::E_MOTOR_BRAKE_COAST);
 				mogo.set_value(true);
 
@@ -1949,25 +1947,32 @@ namespace hyper {
 				pros::delay(2000);
 				cm->conveyer.move(false);
 
-				cm->dvt.PIDMove(6.25);
+				cm->dvt.PIDMove(5.5);
 				cm->dvt.PIDTurn(-90);
 				
-				cm->dvt.PIDMove(-6);
-				cm->dvt.moveStop();
-				pros::delay(500);
-
+				cm->dvt.PIDMove(-6, 1.6);
+				
 				mogo.set_value(false);
-
-				cm->tell(0, "Mogo engaged: " + std::to_string(cm->mogoMech.getEngaged()));
-				cm->conveyer.move(true);
-
-				pros::delay(10000);
-
+				pros::delay(500);
+								
 				// Collect rings onto mogo
 				cm->dvt.PIDTurn(-90);
+				cm->tell(0, "AFTER FIRST TURN");
+				pros::delay(500);
 				cm->dvt.PIDTurn(-90);
-				cm->conveyer.move(true);
+				cm->tell(0, "AFTER SECOND TURN");
+				pros::delay(500);
 
+				cm->conveyer.move(true);
+				//cm->dvt.PIDTurn(3);
+				cm->dvt.moveDelay(1000);
+				pros::delay(500);
+				cm->dvt.turnDelay(false, 1500);
+				cm->dvt.moveDelay(2000, false);
+				//mogo.set_value(true);
+				//cm->dvt.PIDMove(6);
+
+				pros::delay(10000);
 			}
 
 			void sector2() {
