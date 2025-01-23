@@ -1537,7 +1537,7 @@ namespace hyper {
 			BtnManager resetBtn;
 
 			bool atManualControl = false;
-
+			int resetTarget = 1;
 			double limit = 33600;
 
 			Buttons manualBtns = {
@@ -1588,7 +1588,8 @@ namespace hyper {
 			}
 
 			void resetPos() {
-
+				atManualControl = false;
+				currentTarget = resetTarget;
 			}
 		public:
 			/// @brief Constructor for Lady Brown object
