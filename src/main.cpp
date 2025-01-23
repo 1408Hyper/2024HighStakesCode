@@ -1534,6 +1534,8 @@ namespace hyper {
 			pros::Rotation sensor;
 
 			BtnManager upBtn;
+			BtnManager resetBtn;
+
 			bool atManualControl = false;
 
 			double limit = 33600;
@@ -1584,6 +1586,10 @@ namespace hyper {
 					atManualControl = true;
 				}
 			}
+
+			void resetPos() {
+
+			}
 		public:
 			/// @brief Constructor for Lady Brown object
 			/// @param args Args for Lady Brown object (see args struct for more info)
@@ -1591,6 +1597,10 @@ namespace hyper {
 				AbstractMG(args.abstractMGArgs),
 				upBtn({args.abstractMGArgs.abstractComponentArgs, {
 					pros::E_CONTROLLER_DIGITAL_UP, {std::bind(&LadyBrown::upBtnControl, this)}, {}, {} 
+				}}),
+				resetBtn({
+					args.abstractMGArgs.abstractComponentArgs, {
+						pros::E_CONTROLLER_DIGITAL_L1, {std::bind(&LadyBrown::resetPos, this)}, {}, {}
 				}}),
 				sensor(args.sensorPort) {
 					mg.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
@@ -1603,6 +1613,7 @@ namespace hyper {
 
 			void opControl() override {
 				upBtn.opControl();
+				resetBtn.opControl();
 
 				// Auto control if not manual controol
 				if (atManualControl) {
@@ -1834,7 +1845,7 @@ namespace hyper {
 				
 				// Deposit preload on low wall stake
 				pros::delay(2000);
-				cm->dvt.PIDMove(8.8);
+				cm->dvt.PIDMove(7.7);
 				//pros::lcd::print(2, "Initial phase complete");
 				pros::delay(500);
 
@@ -1846,8 +1857,18 @@ namespace hyper {
 
 				// stop it from hitting the wall
 				cm->conveyer.move(false);
-				cm->dvt.PIDMove(8);
+				cm->dvt.PIDMove(6);
 
+				// Collect mogo
+				
+				cm->dvt.PIDTurn(90);
+				pros::delay(300);
+				cm->dvt.PIDTurn(45);
+				cm->mogoMech.actuate(true);
+				cm->dvt.PIDMove(-12);
+				cm->mogoMech.actuate(false);
+
+				/*
 				cm->dvt.PIDTurn(30);
 				//cm->dvt.PIDMove(20);
 				// uncommnet later
@@ -1879,7 +1900,7 @@ namespace hyper {
 				cm->conveyer.move(false);
 
 				// Prepare for opcontrol
-				//cm->conveyer.move(false);
+				//cm->conveyer.move(false);*/
 
 				// OPTIONAL: Turn to face the wall
 				/*
@@ -1959,18 +1980,25 @@ namespace hyper {
 				cm->dvt.PIDTurn(-90);
 				cm->tell(0, "AFTER FIRST TURN");
 				pros::delay(500);
-				cm->dvt.PIDTurn(-90);
+				cm->dvt.PIDTurn(-78);
 				cm->tell(0, "AFTER SECOND TURN");
 				pros::delay(500);
 
 				cm->conveyer.move(true);
 				//cm->dvt.PIDTurn(3);
-				cm->dvt.moveDelay(1000);
+				cm->dvt.moveDelay(1400);
 				pros::delay(500);
 				cm->dvt.turnDelay(false, 1500);
-				cm->dvt.moveDelay(2000, false);
-				//mogo.set_value(true);
-				//cm->dvt.PIDMove(6);
+				cm->dvt.PIDMove(-10);
+				
+				pros::delay(500);
+				
+				mogo.set_value(true);
+				cm->dvt.PIDMove(5);
+
+				cm->dvt.PIDTurn(90);
+				cm->dvt.PIDMove(-75);
+				mogo.set_value(false);
 
 				pros::delay(10000);
 			}
@@ -2276,7 +2304,7 @@ void testAllAuton() {
 		currentChassis->skillsAuton();
 	}
 
-	if (DO_MATCH_AUTON) {
+	if (MATCH_AUTON_TEST) {
 		autonomous();
 	}
 }
