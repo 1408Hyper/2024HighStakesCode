@@ -1,7 +1,7 @@
 {
   "py/object": "pros.conductor.project.Project",
   "py/state": {
-    "project_name": "1408Hyper-2024VRC-Code",
+    "project_name": "2024HighStakesCode",
     "target": "v5",
     "templates": {
       "kernel": {

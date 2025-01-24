@@ -213,6 +213,12 @@ namespace hyper {
 				return engaged;
 			}
 
+			/// @brief Sets the engaged state of the mech (DO NOT USE UNLESS ABSOLUTELY NECESSARY!!)
+			/// @param value Value to set the engaged state to (DO NOT USE UNLESS ABSOLUTELY NECESSARY!!)
+			void doNotUseThisInYourLifeEver_ForceSetEngaged(bool value) {
+				engaged = value;
+			}
+
 			virtual ~AbstractMech() = default;
 	}; // class AbstractMech
 
@@ -1846,7 +1852,9 @@ namespace hyper {
 				
 				// Deposit preload on low wall stake
 				pros::delay(2000);
-				cm->dvt.PIDMove(7.7);
+				// THIS IS THE LINE THAT CONTROLS HOW FAR FORWARD
+				// TO GO TO THE WALL STAKE
+				cm->dvt.PIDMove(6.5);
 				//pros::lcd::print(2, "Initial phase complete");
 				pros::delay(500);
 
@@ -1858,20 +1866,19 @@ namespace hyper {
 
 				// stop it from hitting the wall
 				cm->conveyer.move(false);
-				cm->dvt.PIDMove(6);
+				cm->dvt.PIDMove(3);
 
 				// Collect mogo
 				
-				cm->dvt.PIDTurn(90);
-				pros::delay(300);
-				cm->dvt.PIDTurn(45);
-				cm->mogoMech.actuate(true);
+				cm->dvt.PIDTurn(120);
+				pros::delay(50);
 				cm->dvt.PIDMove(-12);
 				cm->mogoMech.actuate(false);
+				pros::delay(80);
 
-				/*
-				cm->dvt.PIDTurn(30);
-				//cm->dvt.PIDMove(20);
+				cm->dvt.PIDTurn(120);
+				cm->dvt.PIDMove(10);
+				cm->conveyer.move(true);
 				// uncommnet later
 
 				// Turn halfway through going to mogo
@@ -1927,6 +1934,15 @@ namespace hyper {
                 cm->dvt.PIDTurn(-57);
                 cm->conveyer.move(true);
                 cm->dvt.PIDMove(30);
+			}
+
+			void testMogoAuton() {
+				pros::delay(2000);
+				cm->mogoMech.actuate(true);
+				cm->tell(0, "Mogo actuated");
+				pros::delay(2000);
+				cm->mogoMech.actuate(false);
+				cm->tell(0, "Mogo disactuated");
 			}
 		protected:
 		public:
@@ -2026,6 +2042,8 @@ namespace hyper {
 				AbstractAuton(args.autonArgs) {};
 
 			void run() override {
+				cm->tell(0, "Skills auton running");
+
 				sector1();
 				sector2();
 			}
@@ -2347,7 +2365,6 @@ void mainloopControl() {
 
 void mainControl() {
 	preControl();
-
 	mainloopControl();
 }
 /**
