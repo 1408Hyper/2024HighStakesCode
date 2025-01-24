@@ -1974,17 +1974,20 @@ namespace hyper {
 
 	class SkillsAuton : public AbstractAuton {
 		private:
+			pros::adi::DigitalOut mogo;
+
 			void sector1() {
 				// horrible terrible but oh well
 				// Preload onto wall stake and go forward to clamp mogo
-				pros::adi::DigitalOut mogo(MOGO_MECH_PORT);
 				cm->dvt.setBrakeModes(pros::E_MOTOR_BRAKE_COAST);
 				mogo.set_value(true);
 
+				// wall stake
 				cm->conveyer.move(true);
 				pros::delay(2000);
 				cm->conveyer.move(false);
 
+				// turn and get mogo
 				cm->dvt.PIDMove(5.5);
 				cm->dvt.PIDTurn(-90);
 				
@@ -2016,17 +2019,27 @@ namespace hyper {
 				
 				mogo.set_value(true);
 				pros::delay(200);
-				cm->dvt.PIDMove(5);
-
-				cm->dvt.PIDTurn(115);
-				cm->dvt.PIDMove(-75);
-				mogo.set_value(false);
-
-				pros::delay(10000);
 			}
 
 			void sector2() {
+				cm->dvt.PIDMove(5);
 
+				// turn to the mogo on the other end
+				// and go for it!
+				cm->dvt.PIDTurn(120);
+				cm->dvt.PIDMove(-36);
+				mogo.set_value(false);
+
+				cm->dvt.PIDTurn(-90);
+				pros::delay(40);
+				cm->dvt.PIDTurn(-90);
+
+				cm->conveyer.move(true);
+				cm->dvt.PIDMove(10);
+				cm->dvt.PIDTurn(90);
+				cm->dvt.PIDMove(-10);
+
+				pros::delay(10000);
 			}
 		protected:
 		public:
@@ -2039,7 +2052,9 @@ namespace hyper {
 			/// @brief Creates skills auton object
 			/// @param args Args for skills auton object (check args struct for more info)
 			SkillsAuton(SkillsAutonArgs args) : 
-				AbstractAuton(args.autonArgs) {};
+				AbstractAuton(args.autonArgs),
+				// remove later because its horrible and sad and bad
+				mogo(MOGO_MECH_PORT) {};
 
 			void run() override {
 				cm->tell(0, "Skills auton running");
