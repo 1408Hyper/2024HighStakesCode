@@ -1980,7 +1980,7 @@ namespace hyper {
 				cm->dvt.PIDTurn(-90);
 				cm->tell(0, "AFTER FIRST TURN");
 				pros::delay(500);
-				cm->dvt.PIDTurn(-78);
+				cm->dvt.PIDTurn(-75);
 				cm->tell(0, "AFTER SECOND TURN");
 				pros::delay(500);
 
@@ -1991,12 +1991,17 @@ namespace hyper {
 				cm->dvt.turnDelay(false, 1500);
 				cm->dvt.PIDMove(-10);
 				
+				cm->conveyer.move(true, false);
+
 				pros::delay(500);
+
+				cm->conveyer.move(false);
 				
 				mogo.set_value(true);
+				pros::delay(200);
 				cm->dvt.PIDMove(5);
 
-				cm->dvt.PIDTurn(90);
+				cm->dvt.PIDTurn(115);
 				cm->dvt.PIDMove(-75);
 				mogo.set_value(false);
 
