@@ -1544,7 +1544,7 @@ namespace hyper {
 
 			bool atManualControl = false;
 			int resetTarget = 1;
-			double limit = 33600;
+			double limit = 32000;
 
 			Buttons manualBtns = {
 				pros::E_CONTROLLER_DIGITAL_UP,
@@ -1851,70 +1851,17 @@ namespace hyper {
 			void advancedAuton() {
 				
 				// Deposit preload on low wall stake
-				pros::delay(2000);
+				pros::delay(200);
+				cm->mogoMech.actuate(true);
 				// THIS IS THE LINE THAT CONTROLS HOW FAR FORWARD
 				// TO GO TO THE WALL STAKE
-				cm->dvt.PIDMove(6.5);
+				cm->dvt.PIDMove(-18);
 				//pros::lcd::print(2, "Initial phase complete");
-				pros::delay(500);
-
-				// Move to mogo
-				cm->dvt.PIDTurn(-90);
-				cm->dvt.moveDelay(1600, false);
-				cm->conveyer.move(true);
-				pros::delay(1000);
-
-				// stop it from hitting the wall
-				cm->conveyer.move(false);
-				cm->dvt.PIDMove(3);
-
-				// Collect mogo
-				
-				cm->dvt.PIDTurn(120);
-				pros::delay(50);
-				cm->dvt.PIDMove(-12);
+				pros::delay(300);
 				cm->mogoMech.actuate(false);
-				pros::delay(80);
-
-				cm->dvt.PIDTurn(120);
-				cm->dvt.PIDMove(10);
+				pros::delay(300);
 				cm->conveyer.move(true);
-				// uncommnet later
-
-				// Turn halfway through going to mogo
-				// fix to turn 180 degrees
-				//return;
-				// for some reason 90 degrees has become 180 degrees for some reason
-				cm->dvt.PIDTurn(90);
-				//dvt.PIDTurn(90);
-
-				//return;
-
-				pros::delay(200);
-				//cm->dvt.PIDMove(-8);
-				// uncommnet later
-
-				// Collect mogo
-				cm->mogoMech.actuate(true);
-				pros::delay(500);
-
-				//return;
-				// Turn, move and collect rings
-				cm->dvt.PIDTurn(-55);
-				cm->conveyer.move(true);
-				// uncommnet later
-				//cm->dvt.PIDMove(25);
-				pros::delay(500);
-				cm->conveyer.move(false);
-
-				// Prepare for opcontrol
-				//cm->conveyer.move(false);*/
-
-				// OPTIONAL: Turn to face the wall
-				/*
-				cm->dvt.PIDTurn(150);
-				cm->dvt.PIDMove(70);
-				*/
+				
 			}
 
 			void testGpsAuton() {
@@ -1984,7 +1931,7 @@ namespace hyper {
 
 				// wall stake
 				cm->conveyer.move(true);
-				pros::delay(2000);
+				pros::delay(200);
 				cm->conveyer.move(false);
 
 				// turn and get mogo
@@ -2027,19 +1974,42 @@ namespace hyper {
 				// turn to the mogo on the other end
 				// and go for it!
 				cm->dvt.PIDTurn(120);
-				cm->dvt.PIDMove(-36);
+				cm->dvt.PIDMove(-34);
+				pros::delay(200);
 				mogo.set_value(false);
+				pros::delay(200);
 
 				cm->dvt.PIDTurn(-90);
 				pros::delay(40);
-				cm->dvt.PIDTurn(-90);
+				cm->dvt.PIDTurn(-75);
 
 				cm->conveyer.move(true);
 				cm->dvt.PIDMove(10);
-				cm->dvt.PIDTurn(90);
-				cm->dvt.PIDMove(-10);
-
-				pros::delay(10000);
+				cm->dvt.PIDTurn(120);
+				cm->dvt.PIDMove(-300);
+				pros::delay(100);
+				mogo.set_value(true);
+				cm->conveyer.move(true, false);
+				pros::delay(100);
+				cm->dvt.PIDMove(30);
+				pros::delay(1000);
+				cm->dvt.PIDTurn(170);
+				pros::delay(1000);
+				cm->dvt.PIDMove(-5);
+				cm->conveyer.move(false);
+				pros::delay(100);
+				mogo.set_value(false);
+				pros::delay(200);
+				cm->dvt.PIDTurn(-100);
+				pros::delay(200);
+				cm->dvt.PIDMove(-40);
+				pros::delay(200);
+				mogo.set_value(true);
+				pros::delay(200);
+				cm->conveyer.move(true,false);
+				pros::delay(200);
+				cm->dvt.PIDMove(100);
+				pros::delay(200);
 			}
 		protected:
 		public:
