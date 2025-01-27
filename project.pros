@@ -1,7 +1,7 @@
 {
   "py/object": "pros.conductor.project.Project",
   "py/state": {
-    "project_name": "2024skillsauton",
+    "project_name": "2024HighStakesCode",
     "target": "v5",
     "templates": {
       "kernel": {
