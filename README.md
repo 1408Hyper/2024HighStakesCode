@@ -20,8 +20,8 @@ Additionally, our code features a [**custom built CI/CD testing suite via GitHub
 _This list does not contain all roles, only those most relevant to programming._
 
 1. **Principal _Software Engineer_** > [helloworld3200](https://github.com/helloworld3200)
-2. **Senior _Software Engineer_** > [Aadi-L](https://github.com/Aadi-L)
-3. **Assistant _Software Engineer_** > [krishma2](https://github.com/krishma2)
+2. **Senior _Software Engineer_** > [krishma2](https://github.com/krishma2)
+3. **Assistant _Software Engineer_** > [Aadi-L](https://github.com/Aadi-L)
 
 -  **Principal _Mechanical Engineer_** > [1408H-Builder](https://github.com/1408H-Builder)
 - **Senior _Mechanical Engineer_** > [YuvrajVerma09](https://github.com/YuvrajVerma09)
