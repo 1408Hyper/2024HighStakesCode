@@ -279,6 +279,21 @@ namespace hyper {
 			
 	}; // class AbstractMG
 
+	/// @brief Abstract class for general PID which can be used as a template for specific PID functions.
+	class AbstractPID {
+		
+	/// @brief PID specifically for lateral drivetrain movement.
+	}; // class AbstractPID
+
+	class LateralPID : public AbstractPID {
+
+	}; // class LateralPID
+
+	/// @brief PID specifically for turning drivetrain movement.
+	class TurnPID : public AbstractPID {
+
+	}; // class TurnPID
+
 	/// @brief Class which manages button presses (will run function on up, down and hold states of given button)
 	class BtnManager : public AbstractComponent {
 		private:
