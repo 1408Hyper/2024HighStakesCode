@@ -1436,6 +1436,18 @@ namespace hyper {
 	class TorusSensor : public AbstractComponent {
 		private:
 			bool tick = false;
+			bool lastTick = tick;
+			bool triggered = false;
+
+			void checkTrigger() {
+				if (tick && !lastTick) { // Run this on 0->1 transition
+					conveyer->move(true);
+					triggered = true;
+				} else if (triggered) {
+					conveyer->move(true, false);
+					triggered = false;
+				}
+			}
 		protected:
 		public:
 			pros::Optical sensor;
@@ -1469,16 +1481,14 @@ namespace hyper {
 
 				bool atRed = isNumBetween(hue, TorusHues::red[0], TorusHues::red[1]);
 				//bool atBlue = isNumberBetween(sensor.get_hue(), TorusHues::blue[0], TorusHues::blue[1]);
+				bool atBlue = false;
 
-				if (atRed) {
-					if (tick) {
-						conveyer->move(true, true);
-						tick = true;
-					}
-				} else {
-					conveyer->move(false);
-					tick = false;
-				}
+				tick = atRed || atBlue;
+
+				checkTrigger();
+
+				// don't run anything past this point
+				lastTick = tick;
 			}
 	}; // class TorusSensor
 
