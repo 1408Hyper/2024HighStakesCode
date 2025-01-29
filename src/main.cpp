@@ -1466,13 +1466,13 @@ namespace hyper {
 
 			void opControl() override {
 				float hue = sensor.get_hue();
-				
+
 				bool atRed = isNumBetween(hue, TorusHues::red[0], TorusHues::red[1]);
 				//bool atBlue = isNumberBetween(sensor.get_hue(), TorusHues::blue[0], TorusHues::blue[1]);
 
 				if (atRed) {
 					if (tick) {
-						conveyer->move(true);
+						conveyer->move(true, true);
 						tick = true;
 					}
 				} else {
