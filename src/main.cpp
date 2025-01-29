@@ -1433,6 +1433,55 @@ namespace hyper {
 			}
 	}; // class Conveyer
 
+	class TorusSensor : public AbstractComponent {
+		private:
+			bool tick = false;
+		protected:
+		public:
+			pros::Optical sensor;
+			Conveyer* conveyer;
+
+			/// @brief Args for torus sensor object
+			/// @param abstractComponentArgs Args for AbstractComponent object
+			/// @param sensorPort Port for sensor
+			struct TorusSensorArgs {
+				AbstractComponentArgs abstractComponentArgs;
+				std::uint8_t sensorPort;
+				Conveyer* conveyer;
+			};
+
+			using ArgsType = TorusSensorArgs;
+			
+			struct TorusHues {
+				static constexpr float blue[2] = {130, 160};
+				static constexpr float red[2] = {10, 20};
+			};
+
+			/// @brief Constructor for torus sensor object
+			/// @param args Args for torus sensor object (see args struct for more info)
+			TorusSensor(TorusSensorArgs args) : 
+				AbstractComponent(args.abstractComponentArgs),
+				sensor(args.sensorPort),
+				conveyer(args.conveyer) {};
+
+			void opControl() override {
+				float hue = sensor.get_hue();
+				
+				bool atRed = isNumBetween(hue, TorusHues::red[0], TorusHues::red[1]);
+				//bool atBlue = isNumberBetween(sensor.get_hue(), TorusHues::blue[0], TorusHues::blue[1]);
+
+				if (atRed) {
+					if (tick) {
+						conveyer->move(true);
+						tick = true;
+					}
+				} else {
+					conveyer->move(false);
+					tick = false;
+				}
+			}
+	}; // class TorusSensor
+
 	class Intake : public AbstractMG {
 		private:
 			BiToggle toggle;
@@ -1697,6 +1746,8 @@ namespace hyper {
 
 			MogoStopper mogoStopper;
 
+			TorusSensor torusSensor;
+
 			// All components are stored in this vector
 			vector<AbstractComponent*> components;
 
@@ -1713,6 +1764,7 @@ namespace hyper {
 				MGPorts ladyBrownPorts;
 				std::int8_t ladyBrownRotSensorPort;
 				std::int8_t mogoStopperPort;
+				std::uint8_t torusSensorPort;
 			};
 
 			/// @brief Args for component manager object
@@ -1733,7 +1785,8 @@ namespace hyper {
 				conveyer({args.aca, args.user.conveyerPorts}),
 				ladyBrown({{args.aca, args.user.ladyBrownPorts}, args.user.ladyBrownRotSensorPort}),
 				doinker({args.aca, args.user.doinkerPort}),
-				mogoStopper({args.aca, args.user.mogoStopperPort}) {					// Add component pointers to vector
+				mogoStopper({args.aca, args.user.mogoStopperPort}),
+				torusSensor({args.aca, args.user.torusSensorPort}) {					// Add component pointers to vector
 					// MUST BE DONE AFTER INITIALISATION not BEFORE because of pointer issues
 					components = {
 						&dvt,
@@ -1741,7 +1794,8 @@ namespace hyper {
 						&conveyer,
 						&ladyBrown,
 						&doinker,
-						&mogoStopper
+						&mogoStopper,
+						&torusSensor
 					};
 				};
 
@@ -2128,6 +2182,14 @@ namespace hyper {
 		static_assert(std::is_arithmetic<T>::value, "Value must be arithmetic");
 	}
 
+	/// @brief Checks whether a given color channel is within tolerance.
+	/// @param channel Color to check
+	/// @param target Target colour which the colour should be
+	/// @return Whether the channel is within tolerance
+	bool channelWithinTolerance(const float& channel, const float& target, const float& tolerance = 5) {
+		return std::fabs(channel - target) <= tolerance;
+	}
+
 	std::int32_t prepareMoveVoltage(float raw) {
 		// Round the number to the nearest integer
 		raw = std::round(raw);
@@ -2146,11 +2208,7 @@ namespace hyper {
 	bool isNumBetween(T num, T min, T max) {
 		assertArithmetic(num);
 
-		if ((num >= min) && (num <= max)) {
-			return true;
-		} else {
-			return false;
-		}
+		return ((num >= min) && (num <= max));
 	}
 
 	/// @brief Normalise an angle to the range [-180, 180]
@@ -2249,7 +2307,7 @@ void initDefaultChassis() {
 		{{LEFT_DRIVE_PORTS, RIGHT_DRIVE_PORTS, IMU_PORT, ODOM_ENC_PORTS, GPS_SENSOR_PORT}, // Drivetrain args
 		MOGO_MECH_PORT, DOINKER_PORT, // Mech args
 		CONVEYER_PORTS, LADY_BROWN_PORTS, // MG args
-		LADY_BROWN_ROT_SENSOR_PORT, MOGO_SENSOR_PORT}}); // Sensor args
+		LADY_BROWN_ROT_SENSOR_PORT, MOGO_SENSOR_PORT, CONV_TORUS_PORT}}); // Sensor args
 	
 	currentChassis = &defaultChassis;
 }

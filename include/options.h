@@ -14,6 +14,9 @@
 // Digital sensor port for pneumatics conveyor lift
 #define LIFT_MECH_PORT 'B'
 
+//optical sensor for colour
+#define CONV_TORUS_PORT 20
+
 // Digital sensor port for pneumatics doinker
 #define DOINKER_PORT 'B'
 
