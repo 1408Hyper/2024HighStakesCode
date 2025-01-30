@@ -280,16 +280,31 @@ namespace hyper {
 
 	/// @brief Abstract class for general PID which can be used as a template for specific PID functions.
 	class AbstractPID {
-		
-	/// @brief PID specifically for lateral drivetrain movement.
+	private:
+
+	protected:
+
+	public:
+	
 	}; // class AbstractPID
 
+	/// @brief PID specifically for lateral drivetrain movement.
 	class LateralPID : public AbstractPID {
+	private:
+
+	protected:
+
+	public:
 
 	}; // class LateralPID
 
 	/// @brief PID specifically for turning drivetrain movement.
 	class TurnPID : public AbstractPID {
+	private:
+	
+	protected:
+
+	public:
 
 	}; // class TurnPID
 
@@ -1434,20 +1449,8 @@ namespace hyper {
 
 	/// @brief Torus sensor to automatically reject a red/blue torus when detected by optical sensor
 	class TorusSensor : public AbstractComponent {
-	private:
-		bool tick = false;
-		bool lastTick = tick;
-		bool triggered = false;
-
-		void checkTrigger() {
-			if (tick && !lastTick) { // Run this on 0->1 transition
-				conveyer->move(true);
-				triggered = true;
-			} else if (triggered) {
-				conveyer->move(true, false);
-				triggered = false;
-			}
-		}
+	public:
+		std::uint32_t requiredTicks = 10;
 	protected:
 	public:
 		pros::Optical sensor;
@@ -1463,7 +1466,7 @@ namespace hyper {
 		};
 
 		using ArgsType = TorusSensorArgs;
-		
+	
 		struct TorusHues {
 			static constexpr float blue[2] = {130, 160};
 			static constexpr float red[2] = {10, 20};
@@ -1475,7 +1478,35 @@ namespace hyper {
 			AbstractComponent(args.abstractComponentArgs),
 			sensor(args.sensorPort),
 			conveyer(args.conveyer) {};
+	private:
+		bool tick = false;
+		bool lastTick = tick;
+		
+		bool triggered = false;
+		// each tick is equal to MAINLOOP_DELAY_TIME_MS (should be 20)
+		std::uint32_t ticksPassed = 0;
 
+		void triggerControl() {
+			ticksPassed++;
+
+			if (ticksPassed >= requiredTicks) {
+				conveyer->move(true, false);
+				ticksPassed = 0;
+				triggered = false;
+			}
+		}
+
+		void checkTrigger() {
+			if (tick && !lastTick) { // Run this on 0->1 transition
+				conveyer->move(true);
+				triggered = true;
+			} 
+			
+			if (triggered) {
+				triggerControl();
+			}
+		}
+	public:
 		void opControl() override {
 			float hue = sensor.get_hue();
 
