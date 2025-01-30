@@ -1432,6 +1432,7 @@ namespace hyper {
 		}
 	}; // class Conveyer
 
+	/// @brief Torus sensor to automatically reject a red/blue torus when detected by optical sensor
 	class TorusSensor : public AbstractComponent {
 	private:
 		bool tick = false;
