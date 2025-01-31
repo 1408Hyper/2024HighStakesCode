@@ -281,11 +281,23 @@ namespace hyper {
 	/// @brief Abstract class for general PID which can be used as a template for specific PID functions.
 	class AbstractPID {
 	private:
-
+		pros::MotorGroup* left_mg;
+		pros::MotorGroup* right_mg;
 	protected:
+		struct PIDOptions {
+			double kP;
+			double kI;
+			double kD;
+			double errorThreshold;
+			float timeLimit;
+		};
 
+		virtual PIDOptions setupOptions() = 0;
 	public:
-	
+		struct AbstractPIDArgs {
+			pros::MotorGroup* left_mg;
+			pros::MotorGroup* right_mg;
+		};
 	}; // class AbstractPID
 
 	/// @brief PID specifically for lateral drivetrain movement.
