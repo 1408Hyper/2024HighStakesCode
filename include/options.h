@@ -6,6 +6,8 @@
 // Variables (u can change these!!)
 #define MAINLOOP_DELAY_TIME_MS 20
 
+#define REJECT_COLOR_RED true
+
 #define CURRENT_OPCONTROL mainControl
 
 // Digital sensor port for pneumatics mogo mech
@@ -20,10 +22,13 @@
 // Digital sensor port for pneumatics doinker
 #define DOINKER_PORT 'B'
 
+// Hanging Mehcanism
+#define HANGING_MECH_PORT 'E'
+
 #define ODOM_ENC_PORTS {'C', 'D'}
 
 // Ultrasound (1st is ping port, 2nd is echo port)
-#define BACK_ULTRA_PORTS {'E', 'F'}
+#define BACK_ULTRA_PORTS {'G', 'F'}
 
 // Motor ports for the conveyer (real is 10 but use 11 to just turn it off for debugging)
 #define CONVEYER_PORTS {4, -10}
@@ -50,14 +55,14 @@
 #define IMU_PORT 12
 
 // Turn on/off auton and opcontrol
-#define DO_MATCH_AUTON false
+#define DO_MATCH_AUTON true
 #define DO_SKILLS_AUTON false
 
 // Turn on for match auton to be run at the start of opcontrol
-#define MATCH_AUTON_TEST false
+#define MATCH_AUTON_TEST true
 
 #define DO_SKILLS_PREP true
-#define DO_POST_AUTON false
+#define DO_POST_AUTON true
 #define DO_OP_CONTROL true
 
 // Ports for the drivetrain motors

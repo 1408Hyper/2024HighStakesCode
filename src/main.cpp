@@ -706,7 +706,8 @@ namespace hyper {
 		float maxVoltage = 12000;
 
 		// Motor builtin encoder inchesPerTick
-		double inchesPerTick = 0.0127625;
+		double inchesPerTick = 0.034034;
+		//double inchesPerTick = 1.0;
 
 		// Odom wheel encoder inchesPerTick
 		// TODO: Calculate this
@@ -737,7 +738,6 @@ namespace hyper {
 			rightMgSize(args.ports.right.size()) {
 				setDriveControlMode();
 				calibrateIMU();
-				//setBrakeModes(pros::E_MOTOR_BRAKE_HOLD);
 			};
 	private:
 		void prepareArcadeLateral(float& lateral) {
@@ -825,10 +825,6 @@ namespace hyper {
 
 			left_mg.move(left_voltage);
 			right_mg.move(right_voltage);
-		}
-
-		void postAuton() override {
-			setBrakeModes(pros::E_MOTOR_BRAKE_COAST);
 		}
 
 		/// @brief Fallback control that DriveControlMode switch statement defaults to.
@@ -984,13 +980,13 @@ namespace hyper {
 		}
 
 		double getAvgMotorPos() {
-			vector<double> leftPos = left_mg.get_position_all();
+			/*vector<double> leftPos = left_mg.get_position_all();
 			vector<double> rightPos = right_mg.get_position_all();
 
 			double avgLeft = calcMeanFromVector(leftPos, leftMgSize);
-			double avgRight = calcMeanFromVector(rightPos, rightMgSize);
+			double avgRight = calcMeanFromVector(rightPos, rightMgSize);*/
 
-			double avgPos = (avgLeft + avgRight) / 2;
+			double avgPos = (left_mg.get_position() + right_mg.get_position()) / 2;
 
 			return avgPos;
 		}
@@ -1101,7 +1097,7 @@ namespace hyper {
 		/// @param pos Position to move to in inches (use negative for backward)
 		// TODO: Tuning required
 		void PIDMove(double pos, float reductionFactor = 2, PIDOptions options = {
-			0.15, 0.0, 0.6, 3, 6000
+			0.19, 0.0, 0.4, 3, 6000
 		}) {
 			// TODO: Consider adding odometry wheels as the current motor encoders
 			// can be unreliable for long distances or just dont tare the motors
@@ -1124,7 +1120,7 @@ namespace hyper {
 
 			while (true) {
 				// get avg error
-				motorPos = getAvgMotorPos();
+				motorPos = right_mg.get_position();
 				error = pos - motorPos;
 
 				integral += error;
@@ -1390,7 +1386,7 @@ namespace hyper {
 		}
 
 		void postAuton() override {
-			actuate(false);
+			actuate(true);
 		}
 
 		void skillsPrep() override {
@@ -1403,6 +1399,8 @@ namespace hyper {
 	protected:
 	public:
 		BiToggle toggle;
+
+		bool allowController = true;
 
 		/// @brief Args for conveyer object
 		/// @param abstractMGArgs Args for AbstractMG object
@@ -1439,7 +1437,13 @@ namespace hyper {
 		}
 
 		void opControl() override {
-			toggle.opControl();
+			if (allowController) {
+				toggle.opControl();
+			}
+		}
+
+		void postAuton() override {
+			move(true);
 		}
 
 		void skillsPrep() override {
@@ -1450,11 +1454,14 @@ namespace hyper {
 	/// @brief Torus sensor to automatically reject a red/blue torus when detected by optical sensor
 	class TorusSensor : public AbstractComponent {
 	public:
-		std::uint32_t requiredTicks = 10;
+		std::uint32_t stage1RequiredTicks = 7;
+		std::uint32_t stage2RequiredTicks = 4;
 	protected:
 	public:
 		pros::Optical sensor;
 		Conveyer* conveyer;
+
+		bool rejectRed;
 
 		/// @brief Args for torus sensor object
 		/// @param abstractComponentArgs Args for AbstractComponent object
@@ -1463,22 +1470,36 @@ namespace hyper {
 			AbstractComponentArgs abstractComponentArgs;
 			std::uint8_t sensorPort;
 			Conveyer* conveyer;
+			bool rejectRed;
 		};
 
 		using ArgsType = TorusSensorArgs;
 	
 		struct TorusHues {
-			static constexpr float blue[2] = {130, 160};
-			static constexpr float red[2] = {10, 20};
+			static constexpr float BLUE[2] = {150, 170};
+			static constexpr float RED[2] = {10, 30};
 		};
+
+		static constexpr float MAX_LED_PWM = 100;
 
 		/// @brief Constructor for torus sensor object
 		/// @param args Args for torus sensor object (see args struct for more info)
 		TorusSensor(TorusSensorArgs args) : 
 			AbstractComponent(args.abstractComponentArgs),
 			sensor(args.sensorPort),
-			conveyer(args.conveyer) {};
+			conveyer(args.conveyer),
+			rejectRed(args.rejectRed) {
+				sensor.set_led_pwm(MAX_LED_PWM);
+			};
 	private:
+		/*
+		process of torus sensor:
+		1. (on inital colour sensed) wait for conveyer to be moved to the top
+		2. move conveyer BACKWARDS for like 100 ms (short time)
+		3. move conveyer FORWARDS forever
+		disable and reenable the controller input WHILST this is happening
+		*/
+
 		bool tick = false;
 		bool lastTick = tick;
 		
@@ -1489,11 +1510,15 @@ namespace hyper {
 		void triggerControl() {
 			ticksPassed++;
 
-			if (ticksPassed >= requiredTicks) {
+			if (ticksPassed >= stage1RequiredTicks) {
 				conveyer->move(true, false);
 				ticksPassed = 0;
 				triggered = false;
 			}
+		}
+
+		void jerkItOff() {
+
 		}
 
 		void checkTrigger() {
@@ -1510,13 +1535,19 @@ namespace hyper {
 		void opControl() override {
 			float hue = sensor.get_hue();
 
-			bool atRed = isNumBetween(hue, TorusHues::red[0], TorusHues::red[1]);
-			//bool atBlue = isNumberBetween(sensor.get_hue(), TorusHues::blue[0], TorusHues::blue[1]);
-			bool atBlue = false;
+			bool atRed = isNumBetween(hue, TorusHues::RED[0], TorusHues::RED[1]);
+			bool atBlue = isNumBetween(hue, TorusHues::BLUE[0], TorusHues::BLUE[1]);
+			//bool atBlue = false;
 
-			tick = atRed || atBlue;
+			if (rejectRed) {
+				tick = atRed;
+			} else {
+				tick = atBlue;
+			}
 
 			checkTrigger();
+
+			tell(0, "tick: " + std::to_string(tick) + ", " + std::to_string(hue));
 
 			// don't run anything past this point
 			lastTick = tick;
@@ -1772,6 +1803,37 @@ namespace hyper {
 		}
 	};
 
+	/// @brief Class for hanging mechanism
+	class HangingMech : public AbstractMech {
+	private:
+		BtnManager actuateBtn;
+	protected:
+	public:
+		void handleBtn() {
+			actuate(!getEngaged());
+		}
+
+		/// @brief Args for hanging mechanism object
+		/// @param abstractMechArgs Args for AbstractMech object
+		struct HangingMechArgs {
+			AbstractMechArgs abstractMechArgs;
+		};
+
+		using ArgsType = HangingMechArgs;
+
+		/// @brief Constructor for hanging mechanism object
+		/// @param args Args for hanging mechanism object (see args struct for more info)
+		HangingMech(HangingMechArgs args) : 
+			AbstractMech(args.abstractMechArgs),
+			actuateBtn({args.abstractMechArgs.abstractComponentArgs, {
+				pros::E_CONTROLLER_DIGITAL_B, {std::bind(&HangingMech::handleBtn, this)}, {}, {}
+			}}) {};
+
+		void opControl() override {
+			actuateBtn.opControl();
+		}
+	};
+
 	/// @brief Class which manages all components
 	class ComponentManager : public AbstractComponent {
 	private:
@@ -1781,6 +1843,7 @@ namespace hyper {
 
 		MogoMech mogoMech;
 		Doinker doinker;
+		HangingMech hang;
 
 		Conveyer conveyer;
 		LadyBrown ladyBrown;
@@ -1788,6 +1851,7 @@ namespace hyper {
 		MogoStopper mogoStopper;
 
 		TorusSensor torusSensor;
+
 
 		// All components are stored in this vector
 		vector<AbstractComponent*> components;
@@ -1801,11 +1865,13 @@ namespace hyper {
 			Drivetrain::DrivetrainPorts dvtPorts;
 			char mogoMechPort;
 			char doinkerPort;
+			char hangingPort;
 			MGPorts conveyerPorts;
 			MGPorts ladyBrownPorts;
 			std::int8_t ladyBrownRotSensorPort;
 			std::int8_t mogoStopperPort;
 			std::uint8_t torusSensorPort;
+			bool rejectRedToruses;
 		};
 
 		/// @brief Args for component manager object
@@ -1826,8 +1892,9 @@ namespace hyper {
 			conveyer({args.aca, args.user.conveyerPorts}),
 			ladyBrown({{args.aca, args.user.ladyBrownPorts}, args.user.ladyBrownRotSensorPort}),
 			doinker({args.aca, args.user.doinkerPort}),
-			mogoStopper({args.aca, args.user.mogoStopperPort}),
-			torusSensor({args.aca, args.user.torusSensorPort}) {					// Add component pointers to vector
+			hang({args.aca, args.user.hangingPort}),
+			mogoStopper({args.aca, args.user.mogoStopperPort, &mogoMech}),
+			torusSensor({args.aca, args.user.torusSensorPort, &conveyer, args.user.rejectRedToruses}) {					// Add component pointers to vector
 				// MUST BE DONE AFTER INITIALISATION not BEFORE because of pointer issues
 				components = {
 					&dvt,
@@ -1836,7 +1903,8 @@ namespace hyper {
 					&ladyBrown,
 					&doinker,
 					&mogoStopper,
-					&torusSensor
+					//&torusSensor,
+					&hang
 				};
 			};
 
@@ -1945,7 +2013,7 @@ namespace hyper {
 			// 1 tile = 2 feet = 24 inches
 			// 72 = 3 tiles = 3 feet
 			// 96 = 4 tiles = 4 feet
-			cm->dvt.PIDMove(-24);
+			cm->dvt.PIDMove(72);
 		}
 
 		void testIMUAuton() {
@@ -1959,18 +2027,72 @@ namespace hyper {
 		}
 
 		void advancedAuton() {
-			
 			// Deposit preload on low wall stake
-			pros::delay(200);
-			cm->mogoMech.actuate(true);
-			// THIS IS THE LINE THAT CONTROLS HOW FAR FORWARD
-			// TO GO TO THE WALL STAKE
-			cm->dvt.PIDMove(-18);
-			//pros::lcd::print(2, "Initial phase complete");
-			pros::delay(300);
-			cm->mogoMech.actuate(false);
-			pros::delay(300);
-			cm->conveyer.move(true);
+				pros::delay(1000);
+				// THIS IS THE LINE THAT CONTROLS HOW FAR FORWARD
+				// TO GO TO THE WALL STAKE
+				cm->dvt.PIDMove(17);
+				//pros::lcd::print(2, "Initial phase complete");
+				pros::delay(500);
+
+				// Move to mogo
+				cm->dvt.PIDTurn(-90);
+				cm->dvt.moveDelay(1600, false);
+				cm->conveyer.move(true);
+				pros::delay(1000);
+
+				// stop it from hitting the wall
+				cm->conveyer.move(false);
+				cm->dvt.PIDMove(3);
+
+				// Collect mogo
+
+				cm->dvt.PIDTurn(120);
+				pros::delay(50);
+				cm->dvt.PIDMove(-12);
+				cm->mogoMech.actuate(false);
+				pros::delay(80);
+
+				cm->dvt.PIDTurn(120);
+				cm->dvt.PIDMove(10);
+				cm->conveyer.move(true);
+				// uncommnet later
+
+				// Turn halfway through going to mogo
+				// fix to turn 180 degrees
+				//return;
+				// for some reason 90 degrees has become 180 degrees for some reason
+				cm->dvt.PIDTurn(90);
+				//dvt.PIDTurn(90);
+
+				//return;
+
+				pros::delay(200);
+				//cm->dvt.PIDMove(-8);
+				// uncommnet later
+
+				// Collect mogo
+				cm->mogoMech.actuate(true);
+				pros::delay(500);
+
+				//return;
+				// Turn, move and collect rings
+				cm->dvt.PIDTurn(-55);
+				cm->conveyer.move(true);
+				// uncommnet later
+				//cm->dvt.PIDMove(25);
+				pros::delay(500);
+				cm->conveyer.move(false);
+
+				// Prepare for opcontrol
+				//cm->conveyer.move(false);*/
+
+				// OPTIONAL: Turn to face the wall
+				/*
+				cm->dvt.PIDTurn(150);
+				cm->dvt.PIDMove(70);
+				*/
+			
 			
 		}
 
@@ -2346,9 +2468,10 @@ hyper::AbstractChassis* currentChassis;
 void initDefaultChassis() {
 	static hyper::Chassis defaultChassis({
 		{{LEFT_DRIVE_PORTS, RIGHT_DRIVE_PORTS, IMU_PORT, ODOM_ENC_PORTS, GPS_SENSOR_PORT}, // Drivetrain args
-		MOGO_MECH_PORT, DOINKER_PORT, // Mech args
+		MOGO_MECH_PORT, DOINKER_PORT, HANGING_MECH_PORT, // Mech args
 		CONVEYER_PORTS, LADY_BROWN_PORTS, // MG args
-		LADY_BROWN_ROT_SENSOR_PORT, MOGO_SENSOR_PORT, CONV_TORUS_PORT}}); // Sensor args
+		LADY_BROWN_ROT_SENSOR_PORT, MOGO_SENSOR_PORT, // Sensor args
+		CONV_TORUS_PORT, REJECT_COLOR_RED}}); // Torus sensor args
 	
 	currentChassis = &defaultChassis;
 }
@@ -2446,7 +2569,8 @@ void preControl() {
 		currentChassis->skillsPrep();
 	}
 
-	if (DO_POST_AUTON) {
+	// only do post auton if we are not in skills prep
+	if (DO_POST_AUTON && !DO_SKILLS_PREP) {
 		currentChassis->postAuton();
 	}
 }
