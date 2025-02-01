@@ -1851,6 +1851,29 @@ namespace hyper {
 		}
 	};
 
+	class Timer : public AbstractComponent {
+		private:
+			int waitTime = 20;
+		protected:
+		public:
+			/// @brief Args for timer object
+			/// @param abstractComponentArgs Args for AbstractComponent object
+			struct TimerArgs {
+				AbstractComponentArgs abstractComponentArgs;
+			};
+
+			using ArgsType = TimerArgs;
+
+			/// @brief Constructor for timer object
+			/// @param args Args for timer object (see args struct for more info)
+			Timer(TimerArgs args) : 
+				AbstractComponent(args.abstractComponentArgs) {};
+
+			void opControl() override {
+				pros::delay(waitTime);
+			}
+	}; // class Timer
+
 	/// @brief Class for hanging mechanism
 	class HangingMech : public AbstractMech {
 	private:
@@ -1900,6 +1923,8 @@ namespace hyper {
 
 		TorusSensor torusSensor;
 
+		Timer timer;
+		
 		// All components are stored in this vector
 		vector<AbstractComponent*> components;
 
@@ -1947,7 +1972,8 @@ namespace hyper {
 			doinker({args.aca, args.user.doinkerPort}),
 			hang({args.aca, args.user.hangingPort}),
 			mogoStopper({args.aca, args.user.mogoStopperPort, &mogoMech}),
-			torusSensor({args.aca, args.user.torusSensorPort, &conveyer, args.user.rejectRedToruses}) {					// Add component pointers to vector
+			torusSensor({args.aca, args.user.torusSensorPort, &conveyer, args.user.rejectRedToruses}),			
+			timer({args.aca}) { 												// Add component pointers to vector
 				// MUST BE DONE AFTER INITIALISATION not BEFORE because of pointer issues
 				components = {
 					&dvt,
