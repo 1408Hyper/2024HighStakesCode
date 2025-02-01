@@ -1851,9 +1851,14 @@ namespace hyper {
 		}
 	};
 
+	/// @brief Class for timer object to control timings
 	class Timer : public AbstractComponent {
 		private:
 			int waitTime = 20;
+
+			void wait() {
+				pros::delay(waitTime);
+			}
 		protected:
 		public:
 			/// @brief Args for timer object
@@ -1869,8 +1874,14 @@ namespace hyper {
 			Timer(TimerArgs args) : 
 				AbstractComponent(args.abstractComponentArgs) {};
 
+			/// @brief Gets the wait time for the timer
+			/// @return Time to wait for in milliseconds
+			int getWaitTime() {
+				return waitTime;
+			}
+
 			void opControl() override {
-				pros::delay(waitTime);
+				wait();
 			}
 	}; // class Timer
 
@@ -1983,7 +1994,8 @@ namespace hyper {
 					&doinker,
 					&mogoStopper,
 					//&torusSensor,
-					&hang
+					&hang,
+					&timer
 				};
 			};
 
