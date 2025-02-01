@@ -4,10 +4,11 @@
 #define _HYPER_OPTIONS_H_
 
 // Variables (u can change these!!)
-#define MAINLOOP_DELAY_TIME_MS 20
 
+// Whether to make the torus sensor reject red or blue colors
 #define REJECT_COLOR_RED true
 
+// Main opcontrol function to use
 #define CURRENT_OPCONTROL mainControl
 
 // Digital sensor port for pneumatics mogo mech
@@ -61,6 +62,7 @@
 // Turn on for match auton to be run at the start of opcontrol
 #define MATCH_AUTON_TEST true
 
+// Turn on for skills prep/post auton/opcontrol functions to be run on components
 #define DO_SKILLS_PREP true
 #define DO_POST_AUTON true
 #define DO_OP_CONTROL true

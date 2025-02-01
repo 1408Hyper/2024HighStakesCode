@@ -2672,8 +2672,6 @@ void mainloopControl() {
 	while (opControlRunning) {
 		// Chassis opcontrol
 		currentChassis->opControl();
-
-		pros::delay(MAINLOOP_DELAY_TIME_MS);
 	}
 }
 
