@@ -1880,7 +1880,7 @@ namespace hyper {
 		void opControl() override {
 			actuateBtn.opControl();
 		}
-	};
+	}; // class HangingMech
 
 	/// @brief Class which manages all components
 	class ComponentManager : public AbstractComponent {
@@ -1900,15 +1900,20 @@ namespace hyper {
 
 		TorusSensor torusSensor;
 
-
 		// All components are stored in this vector
 		vector<AbstractComponent*> components;
 
 		/// @brief Args for component manager object passed to the chassis, such as ports
-		/// @param dvtArgs Args for drivetrain object
-		/// @param mogoMechArgs Args for mogo mech object
-		/// @param conveyerArgs Args for conveyer object
-		/// @param intakeArgs Args for intake object
+		/// @param dvtPorts Ports for drivetrain
+		/// @param mogoMechPort Port for mogo mech
+		/// @param doinkerPort Port for doinker
+		/// @param hangingPort Port for hanging mechanism
+		/// @param conveyerPorts Ports for conveyer
+		/// @param ladyBrownPorts Ports for lady brown
+		/// @param ladyBrownRotSensorPort Port for lady brown rotation sensor
+		/// @param mogoStopperPort Port for mogo stopper
+		/// @param torusSensorPort Port for torus sensor
+		/// @param rejectRedToruses Whether to reject red toruses
 		struct ComponentManagerUserArgs {
 			Drivetrain::DrivetrainPorts dvtPorts;
 			char mogoMechPort;
