@@ -292,12 +292,48 @@ namespace hyper {
 			float timeLimit;
 		};
 
+		struct PIDRuntimeVars {
+			float error = 0;
+			float lastError = 0;
+			float derivative = 0;
+			float integral = 0;
+			float out = 0;
+			float cycles = 0;
+			bool running = true;
+			const float maxCycles = 0;
+			
+			PIDRuntimeVars(float timeLimitMs, float moveDelayMs) : 
+				maxCycles(timeLimitMs / moveDelayMs) {}
+		};
+
+		// Setup constants for the PID
 		virtual PIDOptions setupOptions() = 0;
+		// Change the input so that it is suitable for the PID
+		virtual std::int32_t preprocessInput(std::int32_t target) = 0;
+		// Get the motor position/IMU position
+		virtual std::int32_t getPos() = 0;
+
+		// Change the output voltage to one which is suitable
+		virtual std::int32_t postprocessOutput(std::int32_t output) = 0;
+		// Add additional code to the main loop
+		virtual void mainloopInject(PIDRuntimeVars& rv) {};
+	private:
+		PIDOptions options;
 	public:
 		struct AbstractPIDArgs {
 			pros::MotorGroup* left_mg;
 			pros::MotorGroup* right_mg;
 		};
+
+		AbstractPID(AbstractPIDArgs args) : 
+			left_mg(args.left_mg),
+			right_mg(args.right_mg) {
+				options = setupOptions();
+		};
+
+		void move() {
+			
+		}
 	}; // class AbstractPID
 
 	/// @brief PID specifically for lateral drivetrain movement.
