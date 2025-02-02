@@ -281,9 +281,11 @@ namespace hyper {
 	/// @brief Abstract class for general PID which can be used as a template for specific PID functions.
 	class AbstractPID {
 	private:
+		bool needSetupOptions = true;
+	protected:
 		pros::MotorGroup* left_mg;
 		pros::MotorGroup* right_mg;
-	protected:
+
 		struct PIDOptions {
 			double kP;
 			double kI;
@@ -327,12 +329,13 @@ namespace hyper {
 
 		AbstractPID(AbstractPIDArgs args) : 
 			left_mg(args.left_mg),
-			right_mg(args.right_mg) {
-				options = setupOptions();
-		};
+			right_mg(args.right_mg) {};
 
 		void move() {
-			
+			if (needSetupOptions) {
+				options = setupOptions();
+				needSetupOptions = false;
+			}
 		}
 	}; // class AbstractPID
 
@@ -1206,151 +1209,6 @@ namespace hyper {
 			moveStop();
 		}
 
-		void BangGPS(double pos, int velocity = -200) {
-			bool direction = pos > 0;
-
-			int lastPos = 0;
-
-			int difference = 0;
-			if (direction) {
-				lastPos = gps.get_position_x();
-			} else {
-				lastPos = gps.get_position_y();
-			}
-			float motorPos = 0;
-
-			moveSingleVelocity(velocity);
-
-			while (true) {
-				if (direction) {
-					motorPos = gps.get_position_x();
-				} else {
-					motorPos = gps.get_position_y();
-				}
-
-				difference += motorPos - lastPos;
-
-				if (difference >= pos) {
-					break;
-				}
-
-				lastPos = motorPos;
-				pros::delay(20);
-			}
-
-			moveStop();
-		}
-
-		/// @brief Move to a specific position using PID with GPS
-		/// @param pos Position to move to in inches (use negative for backward)
-		// TODO: Tuning required
-		// direction bool is for x, invert for y
-		void PIDGps(double pos, bool direction = true, PIDOptions options = {
-			0.1, 0.0, 0.0, 0.1, 6000
-		}) {
-			pos /= 1;
-			//pos *= -1;
-
-			float motorPos = 0;
-			float derivative = 0;
-			float integral = 0;
-			float out = 0;
-
-			float maxCycles = options.timeLimit / moveDelayMs;
-			float cycles = 0;
-
-			bool onFirstRun = true;
-			bool targetPositive = true;
-
-			if (direction) {
-				pos += gps.get_position_y();
-			} else {
-				pos += gps.get_position_x();
-			}
-
-			float error = pos;
-
-			int lastErrorTimes = 0;
-			float lastError = error;
-			derivative = error - lastError;
-			integral = error;
-
-			pros::lcd::print(2, ("GPS Pos: " + std::to_string(gps.get_position_x())).c_str());
-
-			// with moving you just wanna move both MGs at the same speed
-
-			while (true) {
-				// get avg error
-				if (direction) {
-					motorPos = gps.get_position_y();
-				} else {
-					motorPos = gps.get_position_x();
-				}
-
-				error = pos - motorPos;
-
-				integral += error;
-				// Anti windup
-				if (std::fabs(error) < options.errorThreshold) {
-					integral = 0;
-				}
-
-				derivative = error - lastError;
-
-				if (onFirstRun) {
-					if (derivative > 0) {
-						targetPositive = true;
-					} else {
-						targetPositive = false;
-					}
-
-					onFirstRun = false;
-				}
-
-				out = (options.kP * error) + (options.kI * integral) + (options.kD * derivative);
-				lastError = error;
-
-				out *= -0.01; // convert to mV
-				out = std::clamp(out, maxVoltage, -maxVoltage);
-				moveSingleVoltage(out);
-
-				pros::lcd::print(4, ("GPS " + std::to_string(motorPos)).c_str());
-				pros::lcd::print(7, ("PIDMove Out: " + std::to_string(out)).c_str());
-				pros::lcd::print(5, ("PIDMove Error: " + std::to_string(error)).c_str());
-
-				master->print(0, 0, ("error: " + std::to_string(error)).c_str());
-
-				if (std::fabs(error) <= options.errorThreshold) {
-					master->print(0, 0, "PIDGPS YAY %f", error);
-					break;
-				}
-
-				if (std::fabs(error) >= std::fabs(lastError)) {
-					lastErrorTimes++;
-				}
-
-				if (lastErrorTimes >= 3) {
-					//pros::lcd::print(7, "PIDGPS ERROR LIMIT REACHED");
-					//break;
-				}
-
-				if (integral >= pos) {
-					//pros::lcd::print(7, "PIDGPS INTEGRAL LIMIT REACHED");
-					//break;
-				}
-
-				if (cycles >= maxCycles) {
-					pros::lcd::print(4, "PIDMove Time limit reached");
-					break;
-				}
-
-				pros::delay(moveDelayMs);
-				cycles++;
-			}
-
-			moveStop();
-		}	
-
 		/// @brief Gets the left motor group
 		pros::MotorGroup& getLeftMotorGroup() {
 			return left_mg;
@@ -1601,39 +1459,6 @@ namespace hyper {
 			lastTick = tick;
 		}
 	}; // class TorusSensor
-
-	class Intake : public AbstractMG {
-	private:
-		BiToggle toggle;
-	protected:
-	public:
-		/// @brief Args for intake object
-		/// @param abstractMGArgs Args for AbstractMG object
-		/// @param intakePorts Vector of ports for intake motors
-		struct IntakeArgs {
-			AbstractMGArgs abstractMGArgs;
-			vector<std::int8_t> intakePorts;
-		};
-
-		using ArgsType = IntakeArgs;
-
-		/// @brief Constructor for intake object
-		/// @param args Args for intake object (see args struct for more info)
-		Intake(IntakeArgs args) :
-			AbstractMG(args.abstractMGArgs),
-			toggle({this, {
-				pros::E_CONTROLLER_DIGITAL_L1,
-				pros::E_CONTROLLER_DIGITAL_L2
-			}}) {}
-
-		bool canMove(bool on) override {
-			return on;
-		}
-
-		void opControl() override {
-			toggle.opControl();
-		}
-	}; // class Intake
 
 	class MogoStopper : public AbstractComponent {
 	private:
@@ -2044,56 +1869,6 @@ namespace hyper {
 
 	class MatchAuton : public AbstractAuton {
 	private:
-		void defaultAuton() {
-			// destruction 100
-
-			/*//cm->dvt.moveRelPos(300);
-			//
-			cm->dvt.turnDelay(true, 600);
-			cm->dvt.moveRelPos(100);
-			cm->dvt.turnDelay(false, 400);
-			//cm->dvt.moveRelPos(150);
-			cm->dvt.turnDelay(true, 300);*/
-
-			/*cm->intake.move(true, false);
-			cm->conveyer.move(true);*/
-
-			// Because auton is only 15 secs no need to divide into sectors
-			// Move and collect first rings/discombobulate first
-			//cm->intake.move(true);
-			cm->dvt.turnDelay(true, 600);
-			//pros::delay(MAINLOOP_DELAY_TIME_MS);
-			cm->dvt.moveRelPos(50);
-
-			// Get the far ring and turn back onto main path
-			// (no longer necessarily needed because we start with 1 ring already in the robot)
-			cm->dvt.turnDelay(true, 330);
-			cm->dvt.moveRelPos(105);
-			//pros::delay(MAINLOOP_DELAY_TIME_MS);
-			//cm->dvt.turnDelay(false, 1.5);
-
-			// Get other stack knocked over
-			// optional: increase speed to cm->intake if we have no harvester
-			//cm->dvt.moveRelPos(130);
-			//cm->dvt.moveDelay(600, false);
-			cm->dvt.turnDelay(false, 450);
-			//pros::delay(MAINLOOP_DELAY_TIME_MS);
-			cm->dvt.moveRelPos(160);
-			
-			// Turn into high wall stake & deposit
-			cm->dvt.turnDelay(false, 870);
-			cm->dvt.moveDelay(800, false);
-			//cm->intake.move(false);
-			//liftMech.actuate(true);
-			//pros::delay(MAINLOOP_DELAY_TIME_MS);
-
-			// Deposit on high wall stake
-			//cm->conveyer.move(true, false);
-			pros::delay(2000);
-			//cm->conveyer.move(false);
-			//liftMech.actuate(false);
-		}
-
 		void linedAuton() {
 			cm->dvt.PIDMove(30);
 			cm->dvt.PIDTurn(-45);
@@ -2186,34 +1961,6 @@ namespace hyper {
 			
 			
 		}
-
-		void testGpsAuton() {
-			//cm->dvt.PIDGps(0.6096);
-			cm->dvt.BangGPS(0.2096);
-			pros::delay(20000);
-		}
-
-		void aadiAuton() {
-			cm->mogoMech.actuate(true);
-			cm->dvt.moveSingleVelocity(1);
-			cm->dvt.PIDMove(-29);
-			pros::delay(500);
-			cm->mogoMech.actuate(false);
-			cm->conveyer.move(true);
-			pros::delay(300);
-			cm->dvt.PIDTurn(-57);
-			cm->conveyer.move(true);
-			cm->dvt.PIDMove(30);
-		}
-
-		void testMogoAuton() {
-			pros::delay(2000);
-			cm->mogoMech.actuate(true);
-			cm->tell(0, "Mogo actuated");
-			pros::delay(2000);
-			cm->mogoMech.actuate(false);
-			cm->tell(0, "Mogo disactuated");
-		}
 	protected:
 	public:
 		/// @brief Args for match auton object
@@ -2231,14 +1978,11 @@ namespace hyper {
 		void run() override {
 			// just comment out the auton function u dont want
 
-			//defaultAuton();
 			//calcCoefficientAuton();
 			//calcTurnAuton();
 			//testIMUAuton();
 			//linedAuton();
-			//aadiAuton();
 			advancedAuton();
-			//testGpsAuton();
 		}
 	}; // class MatchAuton
 
