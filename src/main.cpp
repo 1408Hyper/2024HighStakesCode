@@ -1360,8 +1360,8 @@ namespace hyper {
 	/// @brief Torus sensor to automatically reject a red/blue torus when detected by optical sensor
 	class TorusSensor : public AbstractComponent {
 	public:
-		std::uint32_t stage1RequiredTicks = 2;
-		std::uint32_t stage2RequiredTicks = 3;
+		std::uint32_t stage1RequiredTicks = 5;
+		std::uint32_t stage2RequiredTicks = 6;
 		std::uint8_t currentStage = 0;
 	protected:
 	public:
@@ -1426,6 +1426,7 @@ namespace hyper {
 						stage1Ticks = 0;
 						stage2Ticks = 0;
 						conveyer->move(true, false);
+						tell(0, "at stg1");
 					}
 					break;
 				case 2:
@@ -1437,6 +1438,7 @@ namespace hyper {
 						conveyer->move(true);
 						conveyer->allowController = true;
 						triggered = false;
+						tell(0, "at stg2");
 					}
 					break;
 				default:
@@ -1450,11 +1452,13 @@ namespace hyper {
 
 		void checkTrigger() {
 			if (tick && !lastTick) { // Run this on 0->1 transition
+				tell(0, "at stg0");
 				conveyer->allowController = false;
 				triggered = true;
 				currentStage = 1;
 			} 
 			
+			if (tick) {tell(0, "AT color");}
 			triggerControl();
 		}
 	public:
@@ -1838,7 +1842,7 @@ namespace hyper {
 					&ladyBrown,
 					&doinker,
 					&mogoStopper,
-					//&torusSensor,
+					&torusSensor,
 					&hang,
 					&timer
 				};
@@ -1935,7 +1939,8 @@ namespace hyper {
 
 			cm->dvt.PIDTurn(145);
 			pros::delay(100);
-			cm->dvt.PIDMove(-30);
+			cm->dvt.PIDMove(-40);
+			pros::delay(100);
 			cm->mogoMech.actuate(false);
 			pros::delay(80);
 
