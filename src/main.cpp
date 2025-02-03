@@ -1360,8 +1360,9 @@ namespace hyper {
 	/// @brief Torus sensor to automatically reject a red/blue torus when detected by optical sensor
 	class TorusSensor : public AbstractComponent {
 	public:
-		std::uint32_t stage1RequiredTicks = 7;
-		std::uint32_t stage2RequiredTicks = 4;
+		std::uint32_t stage1RequiredTicks = 2;
+		std::uint32_t stage2RequiredTicks = 3;
+		std::uint8_t currentStage = 0;
 	protected:
 	public:
 		pros::Optical sensor;
@@ -1411,15 +1412,35 @@ namespace hyper {
 		
 		bool triggered = false;
 		// each tick is equal to MAINLOOP_DELAY_TIME_MS (should be 20)
-		std::uint32_t ticksPassed = 0;
+		std::uint8_t stage1Ticks = 0;
+		std::uint8_t stage2Ticks = 0;
 
 		void triggerControl() {
-			ticksPassed++;
-
-			if (ticksPassed >= stage1RequiredTicks) {
-				conveyer->move(true, false);
-				ticksPassed = 0;
-				triggered = false;
+			switch (currentStage) {
+				case 0:
+					break;
+				case 1:
+					stage1Ticks++;
+					if (stage1Ticks >= stage1RequiredTicks) {
+						currentStage = 2;
+						stage1Ticks = 0;
+						stage2Ticks = 0;
+						conveyer->move(true, false);
+					}
+					break;
+				case 2:
+					stage2Ticks++;
+					if (stage2Ticks >= stage2RequiredTicks) {
+						currentStage = 0;
+						stage1Ticks = 0;
+						stage2Ticks = 0;
+						conveyer->move(true);
+						conveyer->allowController = true;
+						triggered = false;
+					}
+					break;
+				default:
+					break;
 			}
 		}
 
@@ -1429,13 +1450,12 @@ namespace hyper {
 
 		void checkTrigger() {
 			if (tick && !lastTick) { // Run this on 0->1 transition
-				conveyer->move(true);
+				conveyer->allowController = false;
 				triggered = true;
+				currentStage = 1;
 			} 
 			
-			if (triggered) {
-				triggerControl();
-			}
+			triggerControl();
 		}
 	public:
 		void opControl() override {
@@ -1453,7 +1473,7 @@ namespace hyper {
 
 			checkTrigger();
 
-			tell(0, "tick: " + std::to_string(tick) + ", " + std::to_string(hue));
+			//tell(0, "tick: " + std::to_string(tick) + ", " + std::to_string(hue));
 
 			// don't run anything past this point
 			lastTick = tick;
@@ -1894,72 +1914,72 @@ namespace hyper {
 
 		void advancedAuton() {
 			// Deposit preload on low wall stake
-				pros::delay(1000);
-				// THIS IS THE LINE THAT CONTROLS HOW FAR FORWARD
-				// TO GO TO THE WALL STAKE
-				cm->dvt.PIDMove(17);
-				//pros::lcd::print(2, "Initial phase complete");
-				pros::delay(500);
+			pros::delay(1000);
+			// THIS IS THE LINE THAT CONTROLS HOW FAR FORWARD
+			// TO GO TO THE WALL STAKE
+			cm->dvt.PIDMove(17);
+			//pros::lcd::print(2, "Initial phase complete");
+			pros::delay(100);
 
-				// Move to mogo
-				cm->dvt.PIDTurn(-90);
-				cm->dvt.moveDelay(1600, false);
-				cm->conveyer.move(true);
-				pros::delay(1000);
+			// Move to mogo
+			cm->dvt.PIDTurn(-90);
+			cm->dvt.moveDelay(1500, false);
+			cm->conveyer.move(true);
+			pros::delay(400);
 
-				// stop it from hitting the wall
-				cm->conveyer.move(false);
-				cm->dvt.PIDMove(3);
+			// stop it from hitting the wall
+			cm->conveyer.move(false);
+			cm->dvt.PIDMove(4);
 
-				// Collect mogo
+			// Collect mogo
 
-				cm->dvt.PIDTurn(120);
-				pros::delay(50);
-				cm->dvt.PIDMove(-12);
-				cm->mogoMech.actuate(false);
-				pros::delay(80);
+			cm->dvt.PIDTurn(145);
+			pros::delay(100);
+			cm->dvt.PIDMove(-30);
+			cm->mogoMech.actuate(false);
+			pros::delay(80);
 
-				cm->dvt.PIDTurn(120);
-				cm->dvt.PIDMove(10);
-				cm->conveyer.move(true);
-				// uncommnet later
+			cm->dvt.PIDTurn(120);
+			cm->dvt.PIDMove(10);
+			cm->conveyer.move(true);
+			// uncommnet later
 
-				// Turn halfway through going to mogo
-				// fix to turn 180 degrees
-				//return;
-				// for some reason 90 degrees has become 180 degrees for some reason
-				cm->dvt.PIDTurn(90);
-				//dvt.PIDTurn(90);
+			// Turn halfway through going to mogo
+			// fix to turn 180 degrees
+			//return;
+			// for some reason 90 degrees has become 180 degrees for some reason
+			cm->dvt.PIDTurn(90);
+			//dvt.PIDTurn(90);
 
-				//return;
+			//return;
 
-				pros::delay(200);
-				//cm->dvt.PIDMove(-8);
-				// uncommnet later
+			pros::delay(200);
+			//cm->dvt.PIDMove(-8);
+			// uncommnet later
 
-				// Collect mogo
-				cm->mogoMech.actuate(true);
-				pros::delay(500);
+			// Collect mogo
+			cm->mogoMech.actuate(true);
+			pros::delay(500);
 
-				//return;
-				// Turn, move and collect rings
-				cm->dvt.PIDTurn(-55);
-				cm->conveyer.move(true);
-				// uncommnet later
-				//cm->dvt.PIDMove(25);
-				pros::delay(500);
-				cm->conveyer.move(false);
+			//return;
+			// Turn, move and collect rings
+			cm->dvt.PIDTurn(-60);
+			cm->conveyer.move(true);
+			// uncommnet later
+			//cm->dvt.PIDMove(25);
+			pros::delay(500);
+			cm->conveyer.move(false);
 
-				// Prepare for opcontrol
-				//cm->conveyer.move(false);*/
+			// Prepare for opcontrol
+			//cm->conveyer.move(false);*/
 
-				// OPTIONAL: Turn to face the wall
-				/*
-				cm->dvt.PIDTurn(150);
-				cm->dvt.PIDMove(70);
-				*/
+			// OPTIONAL: Turn to face the wall
+			/*
+			cm->dvt.PIDTurn(150);
+			cm->dvt.PIDMove(70);
+			*/			
 			
-			
+
 		}
 	protected:
 	public:
