@@ -1357,133 +1357,6 @@ namespace hyper {
 		}
 	}; // class Conveyer
 
-	/// @brief Torus sensor to automatically reject a red/blue torus when detected by optical sensor
-	class TorusSensor : public AbstractComponent {
-	public:
-		std::uint32_t stage1RequiredTicks = 5;
-		std::uint32_t stage2RequiredTicks = 6;
-		std::uint8_t currentStage = 0;
-	protected:
-	public:
-		pros::Optical sensor;
-		Conveyer* conveyer;
-
-		bool rejectRed;
-
-		/// @brief Args for torus sensor object
-		/// @param abstractComponentArgs Args for AbstractComponent object
-		/// @param sensorPort Port for sensor
-		struct TorusSensorArgs {
-			AbstractComponentArgs abstractComponentArgs;
-			std::uint8_t sensorPort;
-			Conveyer* conveyer;
-			bool rejectRed;
-		};
-
-		using ArgsType = TorusSensorArgs;
-	
-		struct TorusHues {
-			static constexpr float BLUE[2] = {150, 170};
-			static constexpr float RED[2] = {10, 30};
-		};
-
-		static constexpr float MAX_LED_PWM = 100;
-
-		/// @brief Constructor for torus sensor object
-		/// @param args Args for torus sensor object (see args struct for more info)
-		TorusSensor(TorusSensorArgs args) : 
-			AbstractComponent(args.abstractComponentArgs),
-			sensor(args.sensorPort),
-			conveyer(args.conveyer),
-			rejectRed(args.rejectRed) {
-				sensor.set_led_pwm(MAX_LED_PWM);
-			};
-	private:
-		/*
-		process of torus sensor:
-		1. (on inital colour sensed) wait for conveyer to be moved to the top
-		2. move conveyer BACKWARDS for like 100 ms (short time)
-		3. move conveyer FORWARDS forever
-		disable and reenable the controller input WHILST this is happening
-		*/
-
-		bool tick = false;
-		bool lastTick = tick;
-		
-		bool triggered = false;
-		// each tick is equal to MAINLOOP_DELAY_TIME_MS (should be 20)
-		std::uint8_t stage1Ticks = 0;
-		std::uint8_t stage2Ticks = 0;
-
-		void triggerControl() {
-			switch (currentStage) {
-				case 0:
-					break;
-				case 1:
-					stage1Ticks++;
-					if (stage1Ticks >= stage1RequiredTicks) {
-						currentStage = 2;
-						stage1Ticks = 0;
-						stage2Ticks = 0;
-						conveyer->move(true, false);
-						tell(0, "at stg1");
-					}
-					break;
-				case 2:
-					stage2Ticks++;
-					if (stage2Ticks >= stage2RequiredTicks) {
-						currentStage = 0;
-						stage1Ticks = 0;
-						stage2Ticks = 0;
-						conveyer->move(true);
-						conveyer->allowController = true;
-						triggered = false;
-						tell(0, "at stg2");
-					}
-					break;
-				default:
-					break;
-			}
-		}
-
-		void jerkItOff() {
-
-		}
-
-		void checkTrigger() {
-			if (tick && !lastTick) { // Run this on 0->1 transition
-				tell(0, "at stg0");
-				conveyer->allowController = false;
-				triggered = true;
-				currentStage = 1;
-			} 
-			
-			if (tick) {tell(0, "AT color");}
-			triggerControl();
-		}
-	public:
-		void opControl() override {
-			float hue = sensor.get_hue();
-
-			bool atRed = isNumBetween(hue, TorusHues::RED[0], TorusHues::RED[1]);
-			bool atBlue = isNumBetween(hue, TorusHues::BLUE[0], TorusHues::BLUE[1]);
-			//bool atBlue = false;
-
-			if (rejectRed) {
-				tick = atRed;
-			} else {
-				tick = atBlue;
-			}
-
-			checkTrigger();
-
-			//tell(0, "tick: " + std::to_string(tick) + ", " + std::to_string(hue));
-
-			// don't run anything past this point
-			lastTick = tick;
-		}
-	}; // class TorusSensor
-
 	class MogoStopper : public AbstractComponent {
 	private:
 		pros::Optical sensor;
@@ -1625,12 +1498,12 @@ namespace hyper {
 				atManualControl = true;
 			}
 		}
-
+	public:
 		void resetPos() {
 			atManualControl = false;
 			currentTarget = resetTarget;
 		}
-	public:
+	
 		/// @brief Constructor for Lady Brown object
 		/// @param args Args for Lady Brown object (see args struct for more info)
 		LadyBrown(LadyBrownArgs args) : 
@@ -1666,6 +1539,102 @@ namespace hyper {
 			// for more accuracy
 		}
 	}; // class LadyBrown
+
+	/// @brief Torus sensor to automatically reject a red/blue torus when detected by optical sensor
+	class TorusSensor : public AbstractComponent {
+	public:
+		std::uint8_t requiredTicks = 5;
+	protected:
+	public:
+		pros::Optical sensor;
+		LadyBrown* ladyBrown;
+
+		bool rejectRed;
+
+		/// @brief Args for torus sensor object
+		/// @param abstractComponentArgs Args for AbstractComponent object
+		/// @param sensorPort Port for sensor
+		struct TorusSensorArgs {
+			AbstractComponentArgs abstractComponentArgs;
+			std::uint8_t sensorPort;
+			LadyBrown* ladyBrown;
+			bool rejectRed;
+		};
+
+		using ArgsType = TorusSensorArgs;
+	
+		struct TorusHues {
+			static constexpr float BLUE[2] = {150, 170};
+			static constexpr float RED[2] = {10, 30};
+		};
+
+		static constexpr float MAX_LED_PWM = 100;
+
+		/// @brief Constructor for torus sensor object
+		/// @param args Args for torus sensor object (see args struct for more info)
+		TorusSensor(TorusSensorArgs args) : 
+			AbstractComponent(args.abstractComponentArgs),
+			sensor(args.sensorPort),
+			rejectRed(args.rejectRed),
+			ladyBrown(args.ladyBrown) {
+				sensor.set_led_pwm(MAX_LED_PWM);
+			};
+	private:
+		/*
+		process of torus sensor:
+		1. (on inital colour sensed) LB stg1
+		2. LB stg0
+		*/
+
+		bool tick = false;
+		bool lastTick = tick;
+		
+		bool triggered = false;
+		std::int8_t ticks = 0;
+		// each tick is equal to MAINLOOP_DELAY_TIME_MS (should be 20)
+
+		void triggerControl() {
+			requiredTicks++;
+
+			if (ticks >= requiredTicks) {
+				ticks = 0;
+				triggered = false;
+				ladyBrown->decrementTarget();
+			}
+		}
+
+		void checkTrigger() {
+			if (tick && !lastTick) { // Run this on 0->1 transition
+				//tell(0, "at stg0");
+				triggered = true;
+				ladyBrown->resetPos();
+			} 
+			
+			//if (tick) {tell(0, "AT color");}
+			triggerControl();
+		}
+	public:
+		void opControl() override {
+			float hue = sensor.get_hue();
+
+			bool atRed = isNumBetween(hue, TorusHues::RED[0], TorusHues::RED[1]);
+			bool atBlue = isNumBetween(hue, TorusHues::BLUE[0], TorusHues::BLUE[1]);
+			//bool atBlue = false;
+
+			if (rejectRed) {
+				tick = atRed;
+			} else {
+				tick = atBlue;
+			}
+
+			if (triggered) { checkTrigger(); }
+
+			//tell(0, "tick: " + std::to_string(tick) + ", " + std::to_string(hue));
+
+			// don't run anything past this point
+			lastTick = tick;
+		}
+	}; // class TorusSensor
 
 	class Doinker : public AbstractMech {
 	private:
@@ -1832,7 +1801,7 @@ namespace hyper {
 			doinker({args.aca, args.user.doinkerPort}),
 			hang({args.aca, args.user.hangingPort}),
 			mogoStopper({args.aca, args.user.mogoStopperPort, &mogoMech}),
-			torusSensor({args.aca, args.user.torusSensorPort, &conveyer, args.user.rejectRedToruses}),			
+			torusSensor({args.aca, args.user.torusSensorPort, &ladyBrown, args.user.rejectRedToruses}),			
 			timer({args.aca}) { 												// Add component pointers to vector
 				// MUST BE DONE AFTER INITIALISATION not BEFORE because of pointer issues
 				components = {
