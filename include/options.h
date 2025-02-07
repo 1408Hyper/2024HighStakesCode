@@ -6,7 +6,8 @@
 // Variables (u can change these!!)
 
 // Whether to make the torus sensor reject red or blue colors
-#define REJECT_COLOR_RED true
+#define REJECT_COLOR_RED false
+#define DO_REJECT_COLOR false
 
 // Main opcontrol function to use
 #define CURRENT_OPCONTROL mainControl
@@ -61,14 +62,13 @@
 
 // Turn on for match auton to be run at the start of opcontrol
 #define MATCH_AUTON_TEST true
-
 // Turn on for skills prep/post auton/opcontrol functions to be run on components
 #define DO_SKILLS_PREP true
 #define DO_POST_AUTON true
 #define DO_OP_CONTROL true
 
 // Ports for the drivetrain motors
-#define LEFT_DRIVE_PORTS {6, 7, 18}
+#define LEFT_DRIVE_PORTS {6, 21, 18}
 #define RIGHT_DRIVE_PORTS {-13, -14, -15}
 
 // Chassis class to use (default is initDefaultChassis)

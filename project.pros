@@ -1,7 +1,7 @@
 {
   "py/object": "pros.conductor.project.Project",
   "py/state": {
-    "project_name": "2024Tests",
+    "project_name": "1408H Main Code",
     "target": "v5",
     "templates": {
       "kernel": {
@@ -257,7 +257,7 @@
     "upload_options": {
       "description": "1408Hyper's source code for the 2024-25 \"High Stakes\" V5RC season.",
       "icon": "X",
-      "slot": 4
+      "slot": 1
     },
     "use_early_access": false
   }

@@ -1,0 +1,6 @@
+Slots:
+1 = Red Alliance Match
+2 = Blue Alliance Match
+3 = Skills Auton
+4 = Skills Driver
+5 = Tests

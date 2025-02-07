@@ -1440,8 +1440,8 @@ namespace hyper {
 
 		using ArgsType = LadyBrownArgs;
 
-		// Target position to move to (start, halfway, end)
-		vector<double> targets = {0, 180, -1};
+		// Target position to move to (start, halfway, 3/4, end)
+		vector<double> targets = {0, 90, 180, -1};
 
 		pros::Rotation sensor;
 
@@ -1449,7 +1449,8 @@ namespace hyper {
 		BtnManager resetBtn;
 
 		bool atManualControl = false;
-		int resetTarget = 1;
+		int resetTarget = 2;
+		int halfTarget = 1;
 		double limit = 32000;
 
 		Buttons manualBtns = {
@@ -1465,12 +1466,17 @@ namespace hyper {
 			currentTarget = std::clamp(currentTarget, 0, limit);
 		}
 
-		void incrementTarget() {
-			changeTarget(1);
+		void incrementTarget(int increment = 2) {
+			changeTarget(increment);
 		}
 
-		void decrementTarget() {
-			changeTarget(-1);
+		void decrementTarget(int increment = 2) {
+			changeTarget(-increment);
+		}
+
+		void setTargetHalf() {
+			atManualControl = false;
+			currentTarget = halfTarget;
 		}
 	private:
 		void manualControl() {
@@ -1550,6 +1556,7 @@ namespace hyper {
 		LadyBrown* ladyBrown;
 
 		bool rejectRed;
+		bool doReject;
 
 		/// @brief Args for torus sensor object
 		/// @param abstractComponentArgs Args for AbstractComponent object
@@ -1559,6 +1566,7 @@ namespace hyper {
 			std::uint8_t sensorPort;
 			LadyBrown* ladyBrown;
 			bool rejectRed;
+			bool doReject;
 		};
 
 		using ArgsType = TorusSensorArgs;
@@ -1576,7 +1584,8 @@ namespace hyper {
 			AbstractComponent(args.abstractComponentArgs),
 			sensor(args.sensorPort),
 			rejectRed(args.rejectRed),
-			ladyBrown(args.ladyBrown) {
+			ladyBrown(args.ladyBrown),
+			doReject(args.doReject) {
 				sensor.set_led_pwm(MAX_LED_PWM);
 			};
 	private:
@@ -1586,8 +1595,8 @@ namespace hyper {
 		2. LB stg0
 		*/
 
-		bool tick = false;
-		bool lastTick = tick;
+		bool detected = false;
+		bool lastDetected = detected;
 		
 		bool triggered = false;
 		std::int8_t ticks = 0;
@@ -1599,19 +1608,19 @@ namespace hyper {
 			if (ticks >= requiredTicks) {
 				ticks = 0;
 				triggered = false;
-				ladyBrown->decrementTarget();
+				ladyBrown->resetPos();
 			}
 		}
 
 		void checkTrigger() {
-			if (tick && !lastTick) { // Run this on 0->1 transition
+			if (detected && !lastDetected) { // Run this on 0->1 transition
 				//tell(0, "at stg0");
 				triggered = true;
-				ladyBrown->resetPos();
+				ladyBrown->setTargetHalf();
 			} 
 			
 			//if (tick) {tell(0, "AT color");}
-			triggerControl();
+			if (triggered) { triggerControl(); }
 		}
 	public:
 		void opControl() override {
@@ -1621,18 +1630,16 @@ namespace hyper {
 			bool atBlue = isNumBetween(hue, TorusHues::BLUE[0], TorusHues::BLUE[1]);
 			//bool atBlue = false;
 
-			if (rejectRed) {
-				tick = atRed;
-			} else {
-				tick = atBlue;
-			}
+			detected = (rejectRed) ? atRed : atBlue;
 
-			if (triggered) { checkTrigger(); }
+			tell(0, "red/blue: " + std::to_string(atRed) + ", " + std::to_string(atBlue));
+
+			if (doReject) { checkTrigger(); }
 
 			//tell(0, "tick: " + std::to_string(tick) + ", " + std::to_string(hue));
 
 			// don't run anything past this point
-			lastTick = tick;
+			lastDetected = detected;
 		}
 	}; // class TorusSensor
 
@@ -1779,6 +1786,7 @@ namespace hyper {
 			std::int8_t mogoStopperPort;
 			std::uint8_t torusSensorPort;
 			bool rejectRedToruses;
+			bool rejectToruses;
 		};
 
 		/// @brief Args for component manager object
@@ -1801,7 +1809,7 @@ namespace hyper {
 			doinker({args.aca, args.user.doinkerPort}),
 			hang({args.aca, args.user.hangingPort}),
 			mogoStopper({args.aca, args.user.mogoStopperPort, &mogoMech}),
-			torusSensor({args.aca, args.user.torusSensorPort, &ladyBrown, args.user.rejectRedToruses}),			
+			torusSensor({args.aca, args.user.torusSensorPort, &ladyBrown, args.user.rejectRedToruses, args.user.rejectToruses}),			
 			timer({args.aca}) { 												// Add component pointers to vector
 				// MUST BE DONE AFTER INITIALISATION not BEFORE because of pointer issues
 				components = {
@@ -1890,7 +1898,7 @@ namespace hyper {
 			pros::delay(1000);
 			// THIS IS THE LINE THAT CONTROLS HOW FAR FORWARD
 			// TO GO TO THE WALL STAKE
-			cm->dvt.PIDMove(17);
+			cm->dvt.PIDMove(18);
 			//pros::lcd::print(2, "Initial phase complete");
 			pros::delay(100);
 
@@ -1898,7 +1906,7 @@ namespace hyper {
 			cm->dvt.PIDTurn(-90);
 			cm->dvt.moveDelay(1500, false);
 			cm->conveyer.move(true);
-			pros::delay(400);
+			pros::delay(600);
 
 			// stop it from hitting the wall
 			cm->conveyer.move(false);
@@ -1908,16 +1916,19 @@ namespace hyper {
 
 			cm->dvt.PIDTurn(145);
 			pros::delay(100);
-			cm->dvt.PIDMove(-40);
-			pros::delay(100);
+			cm->mogoMech.actuate(true);
+			cm->dvt.PIDMove(-47);
+			pros::delay(200);
 			cm->mogoMech.actuate(false);
 			pros::delay(80);
 
-			cm->dvt.PIDTurn(120);
-			cm->dvt.PIDMove(10);
+			cm->dvt.PIDTurn(130);
+			pros::delay(200);
+			cm->dvt.PIDMove(55);
 			cm->conveyer.move(true);
+			pros::delay(200);
 			// uncommnet later
-
+			cm->mogoMech.actuate(true);
 			// Turn halfway through going to mogo
 			// fix to turn 180 degrees
 			//return;
@@ -1927,18 +1938,20 @@ namespace hyper {
 
 			//return;
 
-			pros::delay(200);
+			
 			//cm->dvt.PIDMove(-8);
 			// uncommnet later
 
 			// Collect mogo
-			cm->mogoMech.actuate(true);
+			
 			pros::delay(500);
 
 			//return;
 			// Turn, move and collect rings
 			cm->dvt.PIDTurn(-60);
 			cm->conveyer.move(true);
+			pros::delay(500);
+			cm->mogoMech.actuate(true);
 			// uncommnet later
 			//cm->dvt.PIDMove(25);
 			pros::delay(500);
@@ -1988,18 +2001,20 @@ namespace hyper {
 			// horrible terrible but oh well
 			// Preload onto wall stake and go forward to clamp mogo
 			cm->dvt.setBrakeModes(pros::E_MOTOR_BRAKE_COAST);
-			mogo.set_value(true);
+			
+			
 
 			// wall stake
 			cm->conveyer.move(true);
-			pros::delay(200);
-			cm->conveyer.move(false);
-
-			// turn and get mogo
-			cm->dvt.PIDMove(5.5);
-			cm->dvt.PIDTurn(-90);
+			pros::delay(500);
 			
-			cm->dvt.PIDMove(-6, 1.6);
+			cm->conveyer.move(false);
+			// turn and get mogo
+			cm->dvt.PIDMove(13);
+			cm->dvt.PIDTurn(-90);
+			mogo.set_value(true);
+			
+			cm->dvt.PIDMove(-25, 1.6);
 			
 			mogo.set_value(false);
 			pros::delay(500);
@@ -2007,17 +2022,33 @@ namespace hyper {
 			// Collect rings onto mogo
 			cm->dvt.PIDTurn(-90);
 			cm->tell(0, "AFTER FIRST TURN");
-			pros::delay(500);
-			cm->dvt.PIDTurn(-75);
+			cm->dvt.PIDTurn(-100);
 			cm->tell(0, "AFTER SECOND TURN");
-			pros::delay(500);
+			pros::delay(200);
 
 			cm->conveyer.move(true);
 			//cm->dvt.PIDTurn(3);
-			cm->dvt.moveDelay(1400);
-			pros::delay(500);
-			cm->dvt.turnDelay(false, 1500);
-			cm->dvt.PIDMove(-10);
+			cm->dvt.PIDMove(30);
+	
+			pros::delay(200);
+			cm->dvt.PIDTurn(10);
+			pros::delay(200);
+			cm->dvt.PIDMove(20);
+			pros::delay(200);
+			cm->dvt.PIDMove(-5);
+			pros::delay(200);
+			cm->dvt.PIDTurn(90);
+			pros::delay(200);
+			cm->dvt.PIDMove(15);
+			cm->dvt.PIDTurn(-95);
+			pros::delay(200);
+			cm->dvt.PIDTurn(-100);
+			pros::delay(200);
+			cm->dvt.PIDMove(30);
+			pros::delay(200);
+			cm->dvt.PIDTurn(-20);
+			pros::delay(200);
+			cm->dvt.PIDMove(-40);
 			
 			cm->conveyer.move(true, false);
 
@@ -2030,45 +2061,53 @@ namespace hyper {
 		}
 
 		void sector2() {
-			cm->dvt.PIDMove(5);
+			cm->dvt.PIDMove(10);
 
 			// turn to the mogo on the other end
 			// and go for it!
-			cm->dvt.PIDTurn(120);
-			cm->dvt.PIDMove(-34);
+			cm->dvt.PIDTurn(110);
+			cm->dvt.PIDMove(-100);
 			pros::delay(200);
 			mogo.set_value(false);
 			pros::delay(200);
 
-			cm->dvt.PIDTurn(-90);
-			pros::delay(40);
-			cm->dvt.PIDTurn(-75);
+			cm->dvt.PIDTurn(90);
+			cm->tell(0, "AFTER FIRST TURN");
+			cm->dvt.PIDTurn(100);
+			cm->tell(0, "AFTER SECOND TURN");
+			pros::delay(200);
 
 			cm->conveyer.move(true);
-			cm->dvt.PIDMove(10);
-			cm->dvt.PIDTurn(120);
-			cm->dvt.PIDMove(-300);
-			pros::delay(100);
-			mogo.set_value(true);
-			cm->conveyer.move(true, false);
-			pros::delay(100);
+			//cm->dvt.PIDTurn(3);
 			cm->dvt.PIDMove(30);
-			pros::delay(1000);
-			cm->dvt.PIDTurn(170);
-			pros::delay(1000);
+			pros::delay(200);
 			cm->dvt.PIDMove(-5);
+			pros::delay(200);
+			cm->dvt.PIDTurn(-10);
+			pros::delay(200);
+			cm->dvt.PIDMove(20);
+			pros::delay(200);
+			cm->dvt.PIDMove(-5);
+			pros::delay(200);
+			cm->dvt.PIDTurn(90);
+			pros::delay(200);
+			cm->dvt.PIDTurn(75);
+			pros::delay(200);
+			
+			pros::delay(200);
+			cm->dvt.PIDMove(-30);
+		
+			
+			cm->conveyer.move(true, false);
+
+			pros::delay(500);
+
 			cm->conveyer.move(false);
-			pros::delay(100);
-			mogo.set_value(false);
-			pros::delay(200);
-			cm->dvt.PIDTurn(-100);
-			pros::delay(200);
-			cm->dvt.PIDMove(-40);
-			pros::delay(200);
+			
 			mogo.set_value(true);
 			pros::delay(200);
-			cm->conveyer.move(true,false);
-			pros::delay(200);
+			cm->dvt.PIDMove(20);
+			cm->dvt.PIDTurn(-60);
 			cm->dvt.PIDMove(100);
 			pros::delay(200);
 		}
@@ -2300,7 +2339,7 @@ void initDefaultChassis() {
 		MOGO_MECH_PORT, DOINKER_PORT, HANGING_MECH_PORT, // Mech args
 		CONVEYER_PORTS, LADY_BROWN_PORTS, // MG args
 		LADY_BROWN_ROT_SENSOR_PORT, MOGO_SENSOR_PORT, // Sensor args
-		CONV_TORUS_PORT, REJECT_COLOR_RED}}); // Torus sensor args
+		CONV_TORUS_PORT, REJECT_COLOR_RED, DO_REJECT_COLOR}}); // Torus sensor args
 	
 	currentChassis = &defaultChassis;
 }
@@ -2374,11 +2413,7 @@ void pneumaticstestcontrol () {
 	}
 }
 
-void testAllAuton() {
-	if (DO_SKILLS_AUTON) {
-		currentChassis->skillsAuton();
-	}
-
+void testMatchAuton() {
 	if (MATCH_AUTON_TEST) {
 		autonomous();
 	}
@@ -2391,7 +2426,11 @@ void preControl() {
 
 	// competition auton test safeguard
 	if (!inComp) {
-		testAllAuton();
+		testMatchAuton();
+	}
+
+	if (DO_SKILLS_AUTON) {
+		currentChassis->skillsAuton();
 	}
 
 	if (DO_SKILLS_PREP) {
