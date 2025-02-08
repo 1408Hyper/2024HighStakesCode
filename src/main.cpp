@@ -1893,20 +1893,24 @@ namespace hyper {
 			cm->dvt.PIDTurn(-90);
 		}
 
+		void specialAuton() {
+			cm->dvt.PIDMove(30);
+		}
+
 		void advancedAuton() {
 			// Deposit preload on low wall stake
-			pros::delay(1000);
+			pros::delay(500);
 			// THIS IS THE LINE THAT CONTROLS HOW FAR FORWARD
 			// TO GO TO THE WALL STAKE
-			cm->dvt.PIDMove(18);
+			cm->dvt.PIDMove(18.5);
 			//pros::lcd::print(2, "Initial phase complete");
 			pros::delay(100);
 
 			// Move to mogo
-			cm->dvt.PIDTurn(-90);
-			cm->dvt.moveDelay(1500, false);
+			cm->dvt.PIDTurn(90);
+			cm->dvt.moveDelay(700, false);
 			cm->conveyer.move(true);
-			pros::delay(600);
+			pros::delay(500);
 
 			// stop it from hitting the wall
 			cm->conveyer.move(false);
@@ -1914,7 +1918,7 @@ namespace hyper {
 
 			// Collect mogo
 
-			cm->dvt.PIDTurn(145);
+			cm->dvt.PIDTurn(-145);
 			pros::delay(100);
 			cm->mogoMech.actuate(true);
 			cm->dvt.PIDMove(-47);
@@ -1922,18 +1926,18 @@ namespace hyper {
 			cm->mogoMech.actuate(false);
 			pros::delay(80);
 
-			cm->dvt.PIDTurn(130);
+			cm->dvt.PIDTurn(-130);
 			pros::delay(200);
 			cm->dvt.PIDMove(55);
 			cm->conveyer.move(true);
 			pros::delay(200);
 			// uncommnet later
-			cm->mogoMech.actuate(true);
+			
 			// Turn halfway through going to mogo
 			// fix to turn 180 degrees
 			//return;
 			// for some reason 90 degrees has become 180 degrees for some reason
-			cm->dvt.PIDTurn(90);
+			
 			//dvt.PIDTurn(90);
 
 			//return;
@@ -1948,7 +1952,7 @@ namespace hyper {
 
 			//return;
 			// Turn, move and collect rings
-			cm->dvt.PIDTurn(-60);
+			cm->dvt.PIDTurn(60);
 			cm->conveyer.move(true);
 			pros::delay(500);
 			cm->mogoMech.actuate(true);
