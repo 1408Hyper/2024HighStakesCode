@@ -766,9 +766,7 @@ namespace hyper {
 
 		uint32_t moveDelayMs = 2;
 
-		// right is positive
-		// left is negative
-		int pidInvertTurn = -1;
+		int pidInvertTurn = 1;
 		float pidReductionFactor = 2;
 
 		float arcDeadband = 30;
@@ -1543,6 +1541,7 @@ namespace hyper {
 				mg.move_absolute(targets[currentTarget], speeds.fwd);
 			}
 
+			tell(0, "Current pos: " + std::to_string(mg.get_position()));
 			// TODO: implement moving the lady brown to targets with rotation sensor instead of motor ticks
 			// for more accuracy
 		}
@@ -1633,8 +1632,6 @@ namespace hyper {
 			//bool atBlue = false;
 
 			detected = (rejectRed) ? atRed : atBlue;
-
-			tell(0, "red/blue: " + std::to_string(atRed) + ", " + std::to_string(atBlue));
 
 			if (doReject) { checkTrigger(); }
 
@@ -1900,22 +1897,23 @@ namespace hyper {
 			pros::delay(1000);
 			// THIS IS THE LINE THAT CONTROLS HOW FAR FORWARD
 			// TO GO TO THE WALL STAKE
-			cm->dvt.PIDMove(18);
+			cm->dvt.PIDMove(17);
 			//pros::lcd::print(2, "Initial phase complete");
 			pros::delay(100);
 
 			// Move to mogo
-			cm->dvt.PIDTurn(90);
-			cm->dvt.moveDelay(700, false);
+			cm->dvt.PIDTurn(-90);
+			cm->dvt.moveDelay(1500, false);
 			cm->conveyer.move(true);
 			pros::delay(400);
+
 			// stop it from hitting the wall
 			cm->conveyer.move(false);
 			cm->dvt.PIDMove(4);
 
 			// Collect mogo
 
-			cm->dvt.PIDTurn(-145);
+			cm->dvt.PIDTurn(145);
 			pros::delay(100);
 			cm->mogoMech.actuate(true);
 			cm->dvt.PIDMove(-47);
@@ -1923,9 +1921,9 @@ namespace hyper {
 			cm->mogoMech.actuate(false);
 			pros::delay(80);
 
-			cm->dvt.PIDTurn(-130);
+			cm->dvt.PIDTurn(130);
 			pros::delay(200);
-			cm->dvt.PIDMove(55);
+			cm->dvt.PIDMove(50);
 			cm->conveyer.move(true);
 			pros::delay(2000);
 			// uncommnet later
@@ -1934,7 +1932,7 @@ namespace hyper {
 			// fix to turn 180 degrees
 			//return;
 			// for some reason 90 degrees has become 180 degrees for some reason
-			cm->dvt.PIDTurn(-90);
+			cm->dvt.PIDTurn(90);
 			//dvt.PIDTurn(90);
 
 			//return;
@@ -1949,9 +1947,9 @@ namespace hyper {
 
 			//return;
 			// Turn, move and collect rings
-			cm->dvt.PIDTurn60);
+			cm->dvt.PIDTurn(-60);
 			cm->conveyer.move(true);
-			pros::delay(500);
+			pros::delay(200);
 			cm->mogoMech.actuate(true);
 			// uncommnet later
 			//cm->dvt.PIDMove(25);
@@ -2030,7 +2028,8 @@ namespace hyper {
 			cm->conveyer.move(true);
 			//cm->dvt.PIDTurn(3);
 			cm->dvt.PIDMove(30);
-	
+			pros::delay(200);
+			cm->dvt.PIDMove(-5);
 			pros::delay(200);
 			cm->dvt.PIDTurn(10);
 			pros::delay(200);
@@ -2414,7 +2413,11 @@ void pneumaticstestcontrol () {
 	}
 }
 
-void testMatchAuton() {
+void testAllAuton() {
+	if (DO_SKILLS_AUTON) {
+		currentChassis->skillsAuton();
+	}
+
 	if (MATCH_AUTON_TEST) {
 		autonomous();
 	}
@@ -2427,11 +2430,7 @@ void preControl() {
 
 	// competition auton test safeguard
 	if (!inComp) {
-		testMatchAuton();
-	}
-
-	if (DO_SKILLS_AUTON) {
-		currentChassis->skillsAuton();
+		testAllAuton();
 	}
 
 	if (DO_SKILLS_PREP) {
