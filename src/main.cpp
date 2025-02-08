@@ -1169,7 +1169,7 @@ namespace hyper {
 			float maxCycles = options.timeLimit / moveDelayMs;
 			float cycles = 0;
 
-			// with moving you just wanna move both MGs at the same speed
+			// with moving you just wanna move both MGsat the same speed
 
 			while (true) {
 				// get avg error
@@ -1897,7 +1897,7 @@ namespace hyper {
 
 		void advancedAuton() {
 			// Deposit preload on low wall stake
-			pros::delay(1000);
+			pros::delay(5000);
 			// THIS IS THE LINE THAT CONTROLS HOW FAR FORWARD
 			// TO GO TO THE WALL STAKE
 			cm->dvt.PIDMove(18);
@@ -1949,7 +1949,7 @@ namespace hyper {
 
 			//return;
 			// Turn, move and collect rings
-			cm->dvt.PIDTurn60);
+			cm->dvt.PIDTurn(60);
 			cm->conveyer.move(true);
 			pros::delay(500);
 			cm->mogoMech.actuate(true);
