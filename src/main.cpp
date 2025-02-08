@@ -768,7 +768,7 @@ namespace hyper {
 
 		// right is positive
 		// left is negative
-		int pidInvertTurn = -1;
+		int pidInvertTurn = 1;
 		float pidReductionFactor = 2;
 
 		float arcDeadband = 30;
