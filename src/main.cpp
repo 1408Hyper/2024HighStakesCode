@@ -1897,7 +1897,7 @@ namespace hyper {
 
 		void advancedAuton() {
 			// Deposit preload on low wall stake
-			pros::delay(5000);
+			pros::delay(2000);
 			// THIS IS THE LINE THAT CONTROLS HOW FAR FORWARD
 			// TO GO TO THE WALL STAKE
 			cm->dvt.PIDMove(18);

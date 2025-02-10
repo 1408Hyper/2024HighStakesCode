@@ -57,8 +57,8 @@
 #define IMU_PORT 12
 
 // Turn on/off auton and opcontrol
-#define DO_MATCH_AUTON false
-#define DO_SKILLS_AUTON true
+#define DO_MATCH_AUTON true
+#define DO_SKILLS_AUTON false
 
 // Turn on for match auton to be run at the start of opcontrol
 #define MATCH_AUTON_TEST true
@@ -68,7 +68,7 @@
 #define DO_OP_CONTROL true
 
 // Ports for the drivetrain motors
-#define LEFT_DRIVE_PORTS {6, 21, 18}
+#define LEFT_DRIVE_PORTS {8, 21, 18}
 #define RIGHT_DRIVE_PORTS {-13, -14, -15}
 
 // Chassis class to use (default is initDefaultChassis)
