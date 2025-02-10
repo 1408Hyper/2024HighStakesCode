@@ -1294,11 +1294,11 @@ namespace hyper {
 		}
 
 		void postAuton() override {
-			actuate(true);
+			//actuate(true);
 		}
 
 		void skillsPrep() override {
-			actuate(true);
+			//actuate(true);
 		}
 	}; // class MogoMech
 
