@@ -1897,10 +1897,9 @@ namespace hyper {
 
 		void advancedAuton() {
 			// Deposit preload on low wall stake
-			pros::delay(2000);
 			// THIS IS THE LINE THAT CONTROLS HOW FAR FORWARD
 			// TO GO TO THE WALL STAKE
-			cm->dvt.PIDMove(18);
+			cm->dvt.PIDMove(15);
 			//pros::lcd::print(2, "Initial phase complete");
 			pros::delay(100);
 
@@ -1908,28 +1907,28 @@ namespace hyper {
 			cm->dvt.PIDTurn(90);
 			cm->dvt.moveDelay(700, false);
 			cm->conveyer.move(true);
-			pros::delay(400);
+			pros::delay(750);
 			// stop it from hitting the wall
 			cm->conveyer.move(false);
 			cm->dvt.PIDMove(4);
 
 			// Collect mogo
 
-			cm->dvt.PIDTurn(-145);
-			pros::delay(100);
+			cm->dvt.PIDTurn(-135);
+			pros::delay(50);
 			cm->mogoMech.actuate(true);
 			cm->dvt.PIDMove(-47);
-			pros::delay(500);
 			cm->mogoMech.actuate(false);
 			pros::delay(80);
 
-			cm->dvt.PIDTurn(-130);
-			pros::delay(200);
-			cm->dvt.PIDMove(55);
+			cm->dvt.PIDTurn(-110);
+			pros::delay(100);
 			cm->conveyer.move(true);
-			pros::delay(2000);
+			cm->dvt.PIDMove(20);
+			pros::delay(500);
+			cm->conveyer.move(false);
 			// uncommnet later
-			cm->mogoMech.actuate(true);
+			//cm->mogoMech.actuate(true);
 			// Turn halfway through going to mogo
 			// fix to turn 180 degrees
 			//return;
@@ -1944,7 +1943,7 @@ namespace hyper {
 			// uncommnet later
 
 			// Collect mogo
-			
+			/*
 			pros::delay(500);
 
 			//return;
@@ -1957,7 +1956,7 @@ namespace hyper {
 			//cm->dvt.PIDMove(25);
 			pros::delay(500);
 			cm->conveyer.move(false);
-
+			*/
 			// Prepare for opcontrol
 			//cm->conveyer.move(false);*/
 
