@@ -1925,7 +1925,7 @@ namespace hyper {
 			pros::delay(100);
 			cm->conveyer.move(true);
 			cm->dvt.PIDMove(20);
-			pros::delay(500);
+			pros::delay(1000);
 			cm->conveyer.move(false);
 			// uncommnet later
 			//cm->mogoMech.actuate(true);
@@ -1966,7 +1966,7 @@ namespace hyper {
 			cm->dvt.PIDMove(70);
 			*/			
 			
-
+			pros::delay(2000);
 		}
 	protected:
 	public:
