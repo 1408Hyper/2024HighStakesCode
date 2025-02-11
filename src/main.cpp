@@ -1064,7 +1064,7 @@ namespace hyper {
 
 			angle *= pidInvertTurn;
 
-			angle /= 1;
+			angle /= -1;
 
 			bool anglePositive = angle > 0;
 			bool turn180 = false;
@@ -1551,11 +1551,11 @@ namespace hyper {
 	/// @brief Torus sensor to automatically reject a red/blue torus when detected by optical sensor
 	class TorusSensor : public AbstractComponent {
 	public:
-		std::uint8_t requiredTicks = 5;
+		std::uint8_t requiredTicks = 50;
 	protected:
 	public:
 		pros::Optical sensor;
-		LadyBrown* ladyBrown;
+		Conveyer* conveyer;
 
 		bool rejectRed;
 		bool doReject;
@@ -1563,10 +1563,13 @@ namespace hyper {
 		/// @brief Args for torus sensor object
 		/// @param abstractComponentArgs Args for AbstractComponent object
 		/// @param sensorPort Port for sensor
+		/// @param conveyer Pointer to conveyer object
+		/// @param rejectRed Whether to reject red torus
+		/// @param doReject Whether to reject torus
 		struct TorusSensorArgs {
 			AbstractComponentArgs abstractComponentArgs;
 			std::uint8_t sensorPort;
-			LadyBrown* ladyBrown;
+			Conveyer* conveyer;
 			bool rejectRed;
 			bool doReject;
 		};
@@ -1586,7 +1589,7 @@ namespace hyper {
 			AbstractComponent(args.abstractComponentArgs),
 			sensor(args.sensorPort),
 			rejectRed(args.rejectRed),
-			ladyBrown(args.ladyBrown),
+			conveyer(args.conveyer),
 			doReject(args.doReject) {
 				sensor.set_led_pwm(MAX_LED_PWM);
 			};
@@ -1610,7 +1613,7 @@ namespace hyper {
 			if (ticks >= requiredTicks) {
 				ticks = 0;
 				triggered = false;
-				ladyBrown->resetPos();
+				conveyer->move(true);
 			}
 		}
 
@@ -1618,7 +1621,7 @@ namespace hyper {
 			if (detected && !lastDetected) { // Run this on 0->1 transition
 				//tell(0, "at stg0");
 				triggered = true;
-				ladyBrown->setTargetHalf();
+				conveyer->move(true, false);
 			} 
 			
 			//if (tick) {tell(0, "AT color");}
@@ -1634,7 +1637,7 @@ namespace hyper {
 
 			detected = (rejectRed) ? atRed : atBlue;
 
-			tell(0, "red/blue: " + std::to_string(atRed) + ", " + std::to_string(atBlue));
+			//tell(0, "red/blue: " + std::to_string(atRed) + ", " + std::to_string(atBlue));
 
 			if (doReject) { checkTrigger(); }
 
@@ -1811,7 +1814,7 @@ namespace hyper {
 			doinker({args.aca, args.user.doinkerPort}),
 			hang({args.aca, args.user.hangingPort}),
 			mogoStopper({args.aca, args.user.mogoStopperPort, &mogoMech}),
-			torusSensor({args.aca, args.user.torusSensorPort, &ladyBrown, args.user.rejectRedToruses, args.user.rejectToruses}),			
+			torusSensor({args.aca, args.user.torusSensorPort, &conveyer, args.user.rejectRedToruses, args.user.rejectToruses}),			
 			timer({args.aca}) { 												// Add component pointers to vector
 				// MUST BE DONE AFTER INITIALISATION not BEFORE because of pointer issues
 				components = {

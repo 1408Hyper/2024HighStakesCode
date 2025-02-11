@@ -6,8 +6,8 @@
 // Variables (u can change these!!)
 
 // Whether to make the torus sensor reject red or blue colors
-#define REJECT_COLOR_RED false
-#define DO_REJECT_COLOR false
+#define REJECT_COLOR_RED true
+#define DO_REJECT_COLOR true
 
 // Main opcontrol function to use
 #define CURRENT_OPCONTROL mainControl
