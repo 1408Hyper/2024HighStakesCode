@@ -2017,14 +2017,13 @@ namespace hyper {
 			cm->dvt.PIDTurn(-90);
 			mogo.set_value(true);
 			
-			cm->dvt.PIDMove(-25, 1.6);
+			cm->dvt.PIDMove(-27, 1.6);
 			
 			mogo.set_value(false);
-			pros::delay(500);
+			pros::delay(200);
 							
 			// Collect rings onto mogo
 			cm->dvt.PIDTurn(-90);
-			cm->tell(0, "AFTER FIRST TURN");
 			cm->dvt.PIDTurn(-100);
 			cm->tell(0, "AFTER SECOND TURN");
 			pros::delay(200);
@@ -2033,23 +2032,25 @@ namespace hyper {
 			//cm->dvt.PIDTurn(3);
 			cm->dvt.PIDMove(30);
 	
-			pros::delay(200);
-			cm->dvt.PIDTurn(10);
+		
 			pros::delay(200);
 			cm->dvt.PIDMove(20);
 			pros::delay(200);
 			cm->dvt.PIDMove(-5);
 			pros::delay(200);
-			cm->dvt.PIDTurn(90);
+			cm->dvt.PIDTurn(110);
+
 			pros::delay(200);
 			cm->dvt.PIDMove(15);
-			cm->dvt.PIDTurn(-95);
-			pros::delay(200);
 			cm->dvt.PIDTurn(-100);
+			pros::delay(200);
+			cm->dvt.PIDTurn(-110);
+			cm->dvt.PIDMove(5);
+			cm->dvt.PIDTurn(-5);
 			pros::delay(200);
 			cm->dvt.PIDMove(30);
 			pros::delay(200);
-			cm->dvt.PIDTurn(-20);
+			cm->dvt.PIDTurn(-30);
 			pros::delay(200);
 			cm->dvt.PIDMove(-40);
 			
