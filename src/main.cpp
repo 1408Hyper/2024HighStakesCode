@@ -2017,7 +2017,7 @@ namespace hyper {
 			cm->dvt.PIDTurn(-90);
 			mogo.set_value(true);
 			
-			cm->dvt.PIDMove(-27, 1.6);
+			cm->dvt.PIDMove(-28, 1.6);
 			
 			mogo.set_value(false);
 			pros::delay(200);
@@ -2026,32 +2026,32 @@ namespace hyper {
 			cm->dvt.PIDTurn(-90);
 			cm->dvt.PIDTurn(-100);
 			cm->tell(0, "AFTER SECOND TURN");
-			pros::delay(200);
-
+			
 			cm->conveyer.move(true);
 			//cm->dvt.PIDTurn(3);
 			cm->dvt.PIDMove(30);
-	
-		
-			pros::delay(200);
-			cm->dvt.PIDMove(20);
-			pros::delay(200);
+			pros::delay(100);
+			cm->dvt.PIDMove(20);	
+			
+			
+			
 			cm->dvt.PIDMove(-5);
-			pros::delay(200);
+			
 			cm->dvt.PIDTurn(110);
 
-			pros::delay(200);
+			
 			cm->dvt.PIDMove(15);
 			cm->dvt.PIDTurn(-100);
-			pros::delay(200);
+			
 			cm->dvt.PIDTurn(-110);
-			cm->dvt.PIDMove(5);
-			cm->dvt.PIDTurn(-5);
-			pros::delay(200);
-			cm->dvt.PIDMove(30);
-			pros::delay(200);
+			
+			
+			cm->conveyer.move(true, false);
+			cm->dvt.PIDMove(40);
+			
+			cm->conveyer.move(true);
 			cm->dvt.PIDTurn(-30);
-			pros::delay(200);
+			
 			cm->dvt.PIDMove(-40);
 			
 			cm->conveyer.move(true, false);
@@ -2069,7 +2069,7 @@ namespace hyper {
 
 			// turn to the mogo on the other end
 			// and go for it!
-			cm->dvt.PIDTurn(110);
+			cm->dvt.PIDTurn(80);
 			cm->dvt.PIDMove(-100);
 			pros::delay(200);
 			mogo.set_value(false);
@@ -2077,7 +2077,7 @@ namespace hyper {
 
 			cm->dvt.PIDTurn(90);
 			cm->tell(0, "AFTER FIRST TURN");
-			cm->dvt.PIDTurn(100);
+			cm->dvt.PIDTurn(80);
 			cm->tell(0, "AFTER SECOND TURN");
 			pros::delay(200);
 
@@ -2091,15 +2091,15 @@ namespace hyper {
 			pros::delay(200);
 			cm->dvt.PIDMove(20);
 			pros::delay(200);
-			cm->dvt.PIDMove(-5);
+			cm->dvt.PIDMove(-10);
 			pros::delay(200);
 			cm->dvt.PIDTurn(90);
 			pros::delay(200);
-			cm->dvt.PIDTurn(75);
+			cm->dvt.PIDTurn(45);
 			pros::delay(200);
 			
 			pros::delay(200);
-			cm->dvt.PIDMove(-30);
+			cm->dvt.PIDMove(-10);
 		
 			
 			cm->conveyer.move(true, false);
@@ -2112,9 +2112,20 @@ namespace hyper {
 			pros::delay(200);
 			cm->dvt.PIDMove(20);
 			cm->dvt.PIDTurn(-60);
-			cm->dvt.PIDMove(100);
+			
 			pros::delay(200);
 		}
+
+		void sector3() {
+
+			cm->dvt.PIDMove(100);
+			cm->dvt.PIDTurn(60);
+			cm->dvt.PIDMove(10);
+			pros::delay(200);
+			cm->dvt.PIDTurn(90);
+			cm->dvt.PIDTurn(90);
+		}
+		
 	protected:
 	public:
 		/// @brief Args for skills auton object
@@ -2135,6 +2146,7 @@ namespace hyper {
 
 			sector1();
 			sector2();
+			sector3();
 		}
 	}; // class SkillsAuton
 
