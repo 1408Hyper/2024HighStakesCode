@@ -1902,7 +1902,7 @@ namespace hyper {
 			// Deposit preload on low wall stake
 			// THIS IS THE LINE THAT CONTROLS HOW FAR FORWARD
 			// TO GO TO THE WALL STAKE
-			cm->dvt.PIDMove(19);
+			cm->dvt.PIDMove(15);
 			//pros::lcd::print(2, "Initial phase complete");
 			pros::delay(100);
 
