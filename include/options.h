@@ -57,8 +57,8 @@
 #define IMU_PORT 12
 
 // Turn on/off auton and opcontrol
-#define DO_MATCH_AUTON false
-#define DO_SKILLS_AUTON true
+#define DO_MATCH_AUTON true
+#define DO_SKILLS_AUTON false
 
 // Turn on for match auton to be run at the start of opcontrol
 #define MATCH_AUTON_TEST true
