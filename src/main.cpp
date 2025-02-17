@@ -2065,8 +2065,8 @@ namespace hyper {
 			//calcTurnAuton();
 			//testIMUAuton();
 			//linedAuton();
-			//advancedAuton_rightstart();
-			advancedAuton_leftstart();
+			advancedAuton_rightstart();
+			//advancedAuton_leftstart();
 		}
 	}; // class MatchAuton
 
