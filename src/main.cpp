@@ -2075,12 +2075,9 @@ namespace hyper {
 		pros::adi::DigitalOut mogo;
 
 		void sector1() {
-			doinker(false);
 			// horrible terrible but oh well
 			// Preload onto wall stake and go forward to clamp mogo
 			cm->dvt.setBrakeModes(pros::E_MOTOR_BRAKE_COAST);
-			
-			
 
 			// wall stake
 			cm->conveyer.move(true);
@@ -2118,8 +2115,10 @@ namespace hyper {
 			cm->dvt.PIDMove(15);
 
 			pros::delay(100);
+			
 			cm->conveyer.move(true);
 			cm->dvt.PIDTurn(-100);
+			cm->conveyer.move(false);
 			
 			cm->dvt.PIDTurn(-105);
 			
@@ -2129,9 +2128,9 @@ namespace hyper {
 			
 			
 			cm->dvt.PIDTurn(-30);
-			cm->dvt.PIDMove(12);
+			cm->dvt.PIDMove(20);
 			
-			cm->dvt.PIDMove(-52);
+			cm->dvt.PIDMove(-60);
 			
 			cm->conveyer.move(true, false);
 
@@ -2162,15 +2161,12 @@ namespace hyper {
 
 			cm->conveyer.move(true);
 			//cm->dvt.PIDTurn(3);
-			cm->dvt.PIDMove(30);
+			cm->dvt.PIDMove(35);
 			pros::delay(200);
 			cm->dvt.PIDMove(-5);
 			pros::delay(200);
 			cm->dvt.PIDTurn(-10);
 			pros::delay(200);
-			cm->dvt.PIDMove(20);
-			pros::delay(200);
-			cm->dvt.PIDMove(-10);
 			pros::delay(200);
 			cm->dvt.PIDTurn(90);
 			pros::delay(200);
@@ -2196,15 +2192,15 @@ namespace hyper {
 		}
 
 		void sector3() {
-
+			cm->conveyer.move(true);
 			cm->dvt.PIDMove(50);
-			doinker(false);
+			cm->doinker.actuate(true);
 			cm->dvt.PIDTurn(60);
 			cm->dvt.PIDMove(30);
 			pros::delay(200);
 			cm->dvt.PIDTurn(90);
-			cm->dvt.PIDTurn(90);
-			cm->dvt.PIDMove(-30);
+			cm->dvt.PIDTurn(105);
+			cm->dvt.PIDMove(-35);
 			mogo.set_value(false);
 
 		}
