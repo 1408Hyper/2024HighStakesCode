@@ -2075,6 +2075,7 @@ namespace hyper {
 		pros::adi::DigitalOut mogo;
 
 		void sector1() {
+			doinker(false);
 			// horrible terrible but oh well
 			// Preload onto wall stake and go forward to clamp mogo
 			cm->dvt.setBrakeModes(pros::E_MOTOR_BRAKE_COAST);
@@ -2087,7 +2088,7 @@ namespace hyper {
 			
 			cm->conveyer.move(false);
 			// turn and get mogo
-			cm->dvt.PIDMove(13);
+			cm->dvt.PIDMove(10);
 			cm->dvt.PIDTurn(-90);
 			mogo.set_value(true);
 			
@@ -2098,14 +2099,14 @@ namespace hyper {
 							
 			// Collect rings onto mogo
 			cm->dvt.PIDTurn(-90);
-			cm->dvt.PIDTurn(-100);
+			cm->dvt.PIDTurn(-90);
 			cm->tell(0, "AFTER SECOND TURN");
 			
 			cm->conveyer.move(true);
 			//cm->dvt.PIDTurn(3);
 			cm->dvt.PIDMove(30);
 			pros::delay(100);
-			cm->dvt.PIDMove(20);	
+			cm->dvt.PIDMove(15);	
 			
 			
 			
@@ -2115,18 +2116,22 @@ namespace hyper {
 
 			
 			cm->dvt.PIDMove(15);
+
+			pros::delay(100);
+			cm->conveyer.move(true);
 			cm->dvt.PIDTurn(-100);
 			
-			cm->dvt.PIDTurn(-110);
+			cm->dvt.PIDTurn(-105);
 			
-			
-			cm->conveyer.move(true, false);
-			cm->dvt.PIDMove(40);
 			
 			cm->conveyer.move(true);
-			cm->dvt.PIDTurn(-30);
+			cm->dvt.PIDMove(40);
 			
-			cm->dvt.PIDMove(-40);
+			
+			cm->dvt.PIDTurn(-30);
+			cm->dvt.PIDMove(12);
+			
+			cm->dvt.PIDMove(-52);
 			
 			cm->conveyer.move(true, false);
 
@@ -2144,7 +2149,7 @@ namespace hyper {
 			// turn to the mogo on the other end
 			// and go for it!
 			cm->dvt.PIDTurn(80);
-			cm->dvt.PIDMove(-100);
+			cm->dvt.PIDMove(-105);
 			pros::delay(200);
 			mogo.set_value(false);
 			pros::delay(200);
@@ -2169,11 +2174,11 @@ namespace hyper {
 			pros::delay(200);
 			cm->dvt.PIDTurn(90);
 			pros::delay(200);
-			cm->dvt.PIDTurn(45);
+			cm->dvt.PIDTurn(60);
 			pros::delay(200);
 			
 			pros::delay(200);
-			cm->dvt.PIDMove(-10);
+			cm->dvt.PIDMove(-15);
 		
 			
 			cm->conveyer.move(true, false);
@@ -2192,12 +2197,16 @@ namespace hyper {
 
 		void sector3() {
 
-			cm->dvt.PIDMove(100);
+			cm->dvt.PIDMove(50);
+			doinker(false);
 			cm->dvt.PIDTurn(60);
-			cm->dvt.PIDMove(10);
+			cm->dvt.PIDMove(30);
 			pros::delay(200);
 			cm->dvt.PIDTurn(90);
 			cm->dvt.PIDTurn(90);
+			cm->dvt.PIDMove(-30);
+			mogo.set_value(false);
+
 		}
 		
 	protected:

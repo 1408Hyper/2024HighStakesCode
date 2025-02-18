@@ -1,7 +1,7 @@
 {
   "py/object": "pros.conductor.project.Project",
   "py/state": {
-    "project_name": "Match right",
+    "project_name": "Skills Auton",
     "target": "v5",
     "templates": {
       "kernel": {
@@ -257,7 +257,7 @@
     "upload_options": {
       "description": "1408Hyper's source code for the 2024-25 \"High Stakes\" V5RC season.",
       "icon": "pros",
-      "slot": 2
+      "slot": 3
     },
     "use_early_access": false
   }
