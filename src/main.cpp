@@ -278,87 +278,6 @@ namespace hyper {
 		virtual ~AbstractMG() = default;
 	}; // class AbstractMG
 
-	/// @brief Abstract class for general PID which can be used as a template for specific PID functions.
-	class AbstractPID {
-	private:
-		bool needSetupOptions = true;
-	protected:
-		pros::MotorGroup* left_mg;
-		pros::MotorGroup* right_mg;
-
-		struct PIDOptions {
-			double kP;
-			double kI;
-			double kD;
-			double errorThreshold;
-			float timeLimit;
-		};
-
-		struct PIDRuntimeVars {
-			float error = 0;
-			float lastError = 0;
-			float derivative = 0;
-			float integral = 0;
-			float out = 0;
-			float cycles = 0;
-			bool running = true;
-			const float maxCycles = 0;
-			
-			PIDRuntimeVars(float timeLimitMs, float moveDelayMs) : 
-				maxCycles(timeLimitMs / moveDelayMs) {}
-		};
-
-		// Setup constants for the PID
-		virtual PIDOptions setupOptions() = 0;
-		// Change the input so that it is suitable for the PID
-		virtual std::int32_t preprocessInput(std::int32_t target) = 0;
-		// Get the motor position/IMU position
-		virtual std::int32_t getPos() = 0;
-
-		// Change the output voltage to one which is suitable
-		virtual std::int32_t postprocessOutput(std::int32_t output) = 0;
-		// Add additional code to the main loop
-		virtual void mainloopInject(PIDRuntimeVars& rv) {};
-	private:
-		PIDOptions options;
-	public:
-		struct AbstractPIDArgs {
-			pros::MotorGroup* left_mg;
-			pros::MotorGroup* right_mg;
-		};
-
-		AbstractPID(AbstractPIDArgs args) : 
-			left_mg(args.left_mg),
-			right_mg(args.right_mg) {};
-
-		void move() {
-			if (needSetupOptions) {
-				options = setupOptions();
-				needSetupOptions = false;
-			}
-		}
-	}; // class AbstractPID
-
-	/// @brief PID specifically for lateral drivetrain movement.
-	class LateralPID : public AbstractPID {
-	private:
-
-	protected:
-
-	public:
-
-	}; // class LateralPID
-
-	/// @brief PID specifically for turning drivetrain movement.
-	class TurnPID : public AbstractPID {
-	private:
-	
-	protected:
-
-	public:
-
-	}; // class TurnPID
-
 	/// @brief Class which manages button presses (will run function on up, down and hold states of given button)
 	class BtnManager : public AbstractComponent {
 	private:
@@ -739,6 +658,7 @@ namespace hyper {
 			double kD;
 			double errorThreshold;
 			float timeLimit;
+			float noMovelimit;
 		};
 
 		DriveControlSpeed driveControlSpeed = {};
@@ -1081,6 +1001,8 @@ namespace hyper {
 			float maxThreshold = 180 - options.errorThreshold;
 
 			float maxCycles = options.timeLimit / moveDelayMs;
+			float cyclesPerSecond = 1000 / moveDelayMs;
+			int cyclesSinceChange = 0;
 			float cycles = 0;
 
 			if (std::fabs(angle) >= 180) {
@@ -1133,6 +1055,8 @@ namespace hyper {
 					pros::lcd::print(4, "PIDTurn Time limit reached");
 					break;
 				}
+
+				
 
 				pros::delay(moveDelayMs);
 				cycles++;
@@ -1889,9 +1813,11 @@ namespace hyper {
 		}
 
 		void testIMUAuton() {
-			cm->dvt.moveVelocity(500, -500);
-			pros::lcd::set_text(5, std::to_string(cm->dvt.getHeading()));
-			pros::delay(10);
+			cm->tell(0, "Started");
+			cm->dvt.PIDTurn(90);
+			cm->tell(0, "Swap");
+			cm->dvt.PIDMove(10);
+			cm->tell(0, "Finished");
 		}
 
 		void calcTurnAuton() {
@@ -2065,8 +1991,8 @@ namespace hyper {
 			//calcTurnAuton();
 			//testIMUAuton();
 			//linedAuton();
-			advancedAuton_rightstart();
-			//advancedAuton_leftstart();
+			//advancedAuton_rightstart();
+			advancedAuton_leftstart();
 		}
 	}; // class MatchAuton
 
@@ -2092,7 +2018,7 @@ namespace hyper {
 			cm->dvt.PIDMove(-28, 1.6);
 			
 			mogo.set_value(false);
-			pros::delay(200);
+			//pros::delay(200);
 							
 			// Collect rings onto mogo
 			cm->dvt.PIDTurn(-90);
@@ -2102,7 +2028,7 @@ namespace hyper {
 			cm->conveyer.move(true);
 			//cm->dvt.PIDTurn(3);
 			cm->dvt.PIDMove(30);
-			pros::delay(100);
+			//pros::delay(100);
 			cm->dvt.PIDMove(15);	
 			
 			
@@ -2114,7 +2040,7 @@ namespace hyper {
 			
 			cm->dvt.PIDMove(15);
 
-			pros::delay(100);
+			//pros::delay(100);
 			
 			cm->conveyer.move(true);
 			cm->dvt.PIDTurn(-100);
@@ -2134,12 +2060,12 @@ namespace hyper {
 			
 			cm->conveyer.move(true, false);
 
-			pros::delay(500);
+			//pros::delay(500);
 
 			cm->conveyer.move(false);
 			
 			mogo.set_value(true);
-			pros::delay(200);
+			//pros::delay(200);
 		}
 
 		void sector2() {
@@ -2149,61 +2075,93 @@ namespace hyper {
 			// and go for it!
 			cm->dvt.PIDTurn(80);
 			cm->dvt.PIDMove(-105);
-			pros::delay(200);
+			//pros::delay(200);
 			mogo.set_value(false);
-			pros::delay(200);
+			pros::delay(50);
 
 			cm->dvt.PIDTurn(90);
 			cm->tell(0, "AFTER FIRST TURN");
 			cm->dvt.PIDTurn(80);
 			cm->tell(0, "AFTER SECOND TURN");
-			pros::delay(200);
+			//pros::delay(200);
 
 			cm->conveyer.move(true);
 			//cm->dvt.PIDTurn(3);
 			cm->dvt.PIDMove(35);
-			pros::delay(200);
+			//pros::delay(200);
 			cm->dvt.PIDMove(-5);
-			pros::delay(200);
+			//pros::delay(200);
 			cm->dvt.PIDTurn(-10);
-			pros::delay(200);
-			pros::delay(200);
+			//pros::delay(200);
+			//pros::delay(200);
 			cm->dvt.PIDTurn(90);
-			pros::delay(200);
+			//pros::delay(200);
 			cm->dvt.PIDTurn(60);
-			pros::delay(200);
+			//pros::delay(200);
 			
-			pros::delay(200);
+			//pros::delay(200);
 			cm->dvt.PIDMove(-15);
 		
 			
 			cm->conveyer.move(true, false);
 
-			pros::delay(500);
+			//pros::delay(500);
 
 			cm->conveyer.move(false);
 			
 			mogo.set_value(true);
-			pros::delay(200);
+			pros::delay(50);
 			cm->dvt.PIDMove(20);
-			cm->dvt.PIDTurn(-60);
+			cm->dvt.PIDTurn(-30);
 			
 			pros::delay(200);
 		}
 
 		void sector3() {
+			mogo.set_value(true);
 			cm->conveyer.move(true);
-			cm->dvt.PIDMove(50);
+			cm->dvt.PIDMove(60);
 			cm->doinker.actuate(true);
 			cm->dvt.PIDTurn(60);
 			cm->dvt.PIDMove(30);
-			pros::delay(200);
+			//pros::delay(200);
+			mogo.set_value(true); //incase the mogo has not unactuated already
 			cm->dvt.PIDTurn(90);
-			cm->dvt.PIDTurn(105);
-			cm->dvt.PIDMove(-35);
+			cm->dvt.PIDTurn(55);
+			cm->dvt.PIDMove(-25);
 			mogo.set_value(false);
 
 		}
+		void sector4() {
+			cm->doinker.actuate(false);
+			cm->dvt.PIDTurn(-90);
+			cm->dvt.PIDMove(-40);
+			cm->conveyer.move(true, false);
+
+			//pros::delay(500);
+
+			cm->conveyer.move(false);
+			
+			mogo.set_value(true);
+
+		}
+		void sector5() {
+			cm->dvt.PIDMove(110);
+			cm->dvt.PIDTurn(-45);
+			cm->dvt.PIDMove(30);
+			cm->conveyer.move(true);
+			cm->dvt.PIDMove(-10);
+			cm->dvt.PIDMove(30);
+			cm->dvt.PIDMove(-5);
+			cm->doinker.actuate(true);
+			cm->dvt.PIDTurn(720);
+			cm->doinker.actuate(false);
+			cm->dvt.PIDMove(35);
+			cm->conveyer.move(false);
+			cm->dvt.PIDMove(5);
+			cm->dvt.PIDMove(-10);
+		}
+		
 		
 	protected:
 	public:
@@ -2226,6 +2184,8 @@ namespace hyper {
 			sector1();
 			sector2();
 			sector3();
+			sector4();
+			sector5();
 		}
 	}; // class SkillsAuton
 

@@ -61,7 +61,7 @@
 #define DO_SKILLS_AUTON true
 
 // Turn on for match auton to be run at the start of opcontrol
-#define MATCH_AUTON_TEST true
+#define MATCH_AUTON_TEST false
 // Turn on for skills prep/post auton/opcontrol functions to be run on components
 #define DO_SKILLS_PREP true
 #define DO_POST_AUTON true
