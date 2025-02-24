@@ -66,6 +66,7 @@ namespace hyper {
 	struct MotorBounds {
 		static constexpr std::int32_t MOVE_MIN = -127;
 		static constexpr std::int32_t MOVE_MAX = 127;
+		static constexpr std::int32_t MILLIVOLT_MAX = 12000;
 	};
 
 	// Class declarations
@@ -1309,6 +1310,9 @@ namespace hyper {
 		BiToggle toggle;
 
 		bool allowController = true;
+		// 0-1 range of percentage of maximum voltage allowed to be supplied to the conveyer
+		// half motor
+		std::int32_t halfMotorReduction = 0.75;
 
 		/// @brief Args for conveyer object
 		/// @param abstractMGArgs Args for AbstractMG object
@@ -1328,6 +1332,9 @@ namespace hyper {
 			}}) {
 				speeds = {10000, -10000};
 				outputSpeeds = true;
+
+				std::int32_t halfMotorMillivoltLimit = MotorBounds::MILLIVOLT_MAX * halfMotorReduction;
+				mg.set_voltage_limit(halfMotorMillivoltLimit, 0);
 				mg.set_gearing_all(pros::motor_gearset_e_t::E_MOTOR_GEAR_RED);
 			};
 
