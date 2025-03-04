@@ -6,6 +6,8 @@
 
 > 1408H's source code for the 2024-25 "High Stakes" season of VRC.
 
+## 📂 **Archived as of High Stakes UK Nationals 2025**, please check our *2025Code* repo for next season's code
+
 ### Sponsored by [Teehee Dental Works](https://teehee.sg/)
 
 **2024HighStakesCode** was designed with portability in mind - we understand that situations can quickly change at any competition.  
