@@ -66,6 +66,7 @@ namespace hyper {
 	struct MotorBounds {
 		static constexpr std::int32_t MOVE_MIN = -127;
 		static constexpr std::int32_t MOVE_MAX = 127;
+		static constexpr std::int32_t MILLIVOLT_MAX = 12000;
 	};
 
 	// Class declarations
@@ -281,11 +282,62 @@ namespace hyper {
 	/// @brief Abstract class for general PID which can be used as a template for specific PID functions.
 	class AbstractPID {
 	private:
-
+		bool needSetupOptions = true;
 	protected:
+		pros::MotorGroup* left_mg;
+		pros::MotorGroup* right_mg;
 
+		struct PIDOptions {
+			double kP;
+			double kI;
+			double kD;
+			double errorThreshold;
+			float timeLimit;
+		};
+
+		struct PIDRuntimeVars {
+			float error = 0;
+			float lastError = 0;
+			float derivative = 0;
+			float integral = 0;
+			float out = 0;
+			float cycles = 0;
+			bool running = true;
+			const float maxCycles = 0;
+			
+			PIDRuntimeVars(float timeLimitMs, float moveDelayMs) : 
+				maxCycles(timeLimitMs / moveDelayMs) {}
+		};
+
+		// Setup constants for the PID
+		virtual PIDOptions setupOptions() = 0;
+		// Change the input so that it is suitable for the PID
+		virtual std::int32_t preprocessInput(std::int32_t target) = 0;
+		// Get the motor position/IMU position
+		virtual std::int32_t getPos() = 0;
+
+		// Change the output voltage to one which is suitable
+		virtual std::int32_t postprocessOutput(std::int32_t output) = 0;
+		// Add additional code to the main loop
+		virtual void mainloopInject(PIDRuntimeVars& rv) {};
+	private:
+		PIDOptions options;
 	public:
-	
+		struct AbstractPIDArgs {
+			pros::MotorGroup* left_mg;
+			pros::MotorGroup* right_mg;
+		};
+
+		AbstractPID(AbstractPIDArgs args) : 
+			left_mg(args.left_mg),
+			right_mg(args.right_mg) {};
+
+		void move() {
+			if (needSetupOptions) {
+				options = setupOptions();
+				needSetupOptions = false;
+			}
+		}
 	}; // class AbstractPID
 
 	/// @brief PID specifically for lateral drivetrain movement.
@@ -715,8 +767,10 @@ namespace hyper {
 
 		uint32_t moveDelayMs = 2;
 
+		// right is positive
+		// left is negative
 		int pidInvertTurn = 1;
-		float pidReductionFactor = 2;
+		float pidReductionFactor = 1.9;
 
 		float arcDeadband = 30;
 
@@ -1011,7 +1065,7 @@ namespace hyper {
 
 			angle *= pidInvertTurn;
 
-			angle /= 1;
+			angle /= -1;
 
 			bool anglePositive = angle > 0;
 			bool turn180 = false;
@@ -1116,7 +1170,7 @@ namespace hyper {
 			float maxCycles = options.timeLimit / moveDelayMs;
 			float cycles = 0;
 
-			// with moving you just wanna move both MGs at the same speed
+			// with moving you just wanna move both MGsat the same speed
 
 			while (true) {
 				// get avg error
@@ -1157,151 +1211,6 @@ namespace hyper {
 
 			moveStop();
 		}
-
-		void BangGPS(double pos, int velocity = -200) {
-			bool direction = pos > 0;
-
-			int lastPos = 0;
-
-			int difference = 0;
-			if (direction) {
-				lastPos = gps.get_position_x();
-			} else {
-				lastPos = gps.get_position_y();
-			}
-			float motorPos = 0;
-
-			moveSingleVelocity(velocity);
-
-			while (true) {
-				if (direction) {
-					motorPos = gps.get_position_x();
-				} else {
-					motorPos = gps.get_position_y();
-				}
-
-				difference += motorPos - lastPos;
-
-				if (difference >= pos) {
-					break;
-				}
-
-				lastPos = motorPos;
-				pros::delay(20);
-			}
-
-			moveStop();
-		}
-
-		/// @brief Move to a specific position using PID with GPS
-		/// @param pos Position to move to in inches (use negative for backward)
-		// TODO: Tuning required
-		// direction bool is for x, invert for y
-		void PIDGps(double pos, bool direction = true, PIDOptions options = {
-			0.1, 0.0, 0.0, 0.1, 6000
-		}) {
-			pos /= 1;
-			//pos *= -1;
-
-			float motorPos = 0;
-			float derivative = 0;
-			float integral = 0;
-			float out = 0;
-
-			float maxCycles = options.timeLimit / moveDelayMs;
-			float cycles = 0;
-
-			bool onFirstRun = true;
-			bool targetPositive = true;
-
-			if (direction) {
-				pos += gps.get_position_y();
-			} else {
-				pos += gps.get_position_x();
-			}
-
-			float error = pos;
-
-			int lastErrorTimes = 0;
-			float lastError = error;
-			derivative = error - lastError;
-			integral = error;
-
-			pros::lcd::print(2, ("GPS Pos: " + std::to_string(gps.get_position_x())).c_str());
-
-			// with moving you just wanna move both MGs at the same speed
-
-			while (true) {
-				// get avg error
-				if (direction) {
-					motorPos = gps.get_position_y();
-				} else {
-					motorPos = gps.get_position_x();
-				}
-
-				error = pos - motorPos;
-
-				integral += error;
-				// Anti windup
-				if (std::fabs(error) < options.errorThreshold) {
-					integral = 0;
-				}
-
-				derivative = error - lastError;
-
-				if (onFirstRun) {
-					if (derivative > 0) {
-						targetPositive = true;
-					} else {
-						targetPositive = false;
-					}
-
-					onFirstRun = false;
-				}
-
-				out = (options.kP * error) + (options.kI * integral) + (options.kD * derivative);
-				lastError = error;
-
-				out *= -0.01; // convert to mV
-				out = std::clamp(out, maxVoltage, -maxVoltage);
-				moveSingleVoltage(out);
-
-				pros::lcd::print(4, ("GPS " + std::to_string(motorPos)).c_str());
-				pros::lcd::print(7, ("PIDMove Out: " + std::to_string(out)).c_str());
-				pros::lcd::print(5, ("PIDMove Error: " + std::to_string(error)).c_str());
-
-				master->print(0, 0, ("error: " + std::to_string(error)).c_str());
-
-				if (std::fabs(error) <= options.errorThreshold) {
-					master->print(0, 0, "PIDGPS YAY %f", error);
-					break;
-				}
-
-				if (std::fabs(error) >= std::fabs(lastError)) {
-					lastErrorTimes++;
-				}
-
-				if (lastErrorTimes >= 3) {
-					//pros::lcd::print(7, "PIDGPS ERROR LIMIT REACHED");
-					//break;
-				}
-
-				if (integral >= pos) {
-					//pros::lcd::print(7, "PIDGPS INTEGRAL LIMIT REACHED");
-					//break;
-				}
-
-				if (cycles >= maxCycles) {
-					pros::lcd::print(4, "PIDMove Time limit reached");
-					break;
-				}
-
-				pros::delay(moveDelayMs);
-				cycles++;
-			}
-
-			moveStop();
-		}	
 
 		/// @brief Gets the left motor group
 		pros::MotorGroup& getLeftMotorGroup() {
@@ -1386,11 +1295,11 @@ namespace hyper {
 		}
 
 		void postAuton() override {
-			actuate(true);
+			//actuate(true);
 		}
 
 		void skillsPrep() override {
-			actuate(true);
+			//actuate(true);
 		}
 	}; // class MogoMech
 
@@ -1401,6 +1310,9 @@ namespace hyper {
 		BiToggle toggle;
 
 		bool allowController = true;
+		// 0-1 range of percentage of maximum voltage allowed to be supplied to the conveyer
+		// half motor
+		std::int32_t halfMotorReduction = 0.75;
 
 		/// @brief Args for conveyer object
 		/// @param abstractMGArgs Args for AbstractMG object
@@ -1420,6 +1332,9 @@ namespace hyper {
 			}}) {
 				speeds = {10000, -10000};
 				outputSpeeds = true;
+
+				std::int32_t halfMotorMillivoltLimit = MotorBounds::MILLIVOLT_MAX * halfMotorReduction;
+				mg.set_voltage_limit(halfMotorMillivoltLimit, 0);
 				mg.set_gearing_all(pros::motor_gearset_e_t::E_MOTOR_GEAR_RED);
 			};
 
@@ -1450,142 +1365,6 @@ namespace hyper {
 			move(true);
 		}
 	}; // class Conveyer
-
-	/// @brief Torus sensor to automatically reject a red/blue torus when detected by optical sensor
-	class TorusSensor : public AbstractComponent {
-	public:
-		std::uint32_t stage1RequiredTicks = 7;
-		std::uint32_t stage2RequiredTicks = 4;
-	protected:
-	public:
-		pros::Optical sensor;
-		Conveyer* conveyer;
-
-		bool rejectRed;
-
-		/// @brief Args for torus sensor object
-		/// @param abstractComponentArgs Args for AbstractComponent object
-		/// @param sensorPort Port for sensor
-		struct TorusSensorArgs {
-			AbstractComponentArgs abstractComponentArgs;
-			std::uint8_t sensorPort;
-			Conveyer* conveyer;
-			bool rejectRed;
-		};
-
-		using ArgsType = TorusSensorArgs;
-	
-		struct TorusHues {
-			static constexpr float BLUE[2] = {150, 170};
-			static constexpr float RED[2] = {10, 30};
-		};
-
-		static constexpr float MAX_LED_PWM = 100;
-
-		/// @brief Constructor for torus sensor object
-		/// @param args Args for torus sensor object (see args struct for more info)
-		TorusSensor(TorusSensorArgs args) : 
-			AbstractComponent(args.abstractComponentArgs),
-			sensor(args.sensorPort),
-			conveyer(args.conveyer),
-			rejectRed(args.rejectRed) {
-				sensor.set_led_pwm(MAX_LED_PWM);
-			};
-	private:
-		/*
-		process of torus sensor:
-		1. (on inital colour sensed) wait for conveyer to be moved to the top
-		2. move conveyer BACKWARDS for like 100 ms (short time)
-		3. move conveyer FORWARDS forever
-		disable and reenable the controller input WHILST this is happening
-		*/
-
-		bool tick = false;
-		bool lastTick = tick;
-		
-		bool triggered = false;
-		// each tick is equal to MAINLOOP_DELAY_TIME_MS (should be 20)
-		std::uint32_t ticksPassed = 0;
-
-		void triggerControl() {
-			ticksPassed++;
-
-			if (ticksPassed >= stage1RequiredTicks) {
-				conveyer->move(true, false);
-				ticksPassed = 0;
-				triggered = false;
-			}
-		}
-
-		void jerkItOff() {
-
-		}
-
-		void checkTrigger() {
-			if (tick && !lastTick) { // Run this on 0->1 transition
-				conveyer->move(true);
-				triggered = true;
-			} 
-			
-			if (triggered) {
-				triggerControl();
-			}
-		}
-	public:
-		void opControl() override {
-			float hue = sensor.get_hue();
-
-			bool atRed = isNumBetween(hue, TorusHues::RED[0], TorusHues::RED[1]);
-			bool atBlue = isNumBetween(hue, TorusHues::BLUE[0], TorusHues::BLUE[1]);
-			//bool atBlue = false;
-
-			if (rejectRed) {
-				tick = atRed;
-			} else {
-				tick = atBlue;
-			}
-
-			checkTrigger();
-
-			tell(0, "tick: " + std::to_string(tick) + ", " + std::to_string(hue));
-
-			// don't run anything past this point
-			lastTick = tick;
-		}
-	}; // class TorusSensor
-
-	class Intake : public AbstractMG {
-	private:
-		BiToggle toggle;
-	protected:
-	public:
-		/// @brief Args for intake object
-		/// @param abstractMGArgs Args for AbstractMG object
-		/// @param intakePorts Vector of ports for intake motors
-		struct IntakeArgs {
-			AbstractMGArgs abstractMGArgs;
-			vector<std::int8_t> intakePorts;
-		};
-
-		using ArgsType = IntakeArgs;
-
-		/// @brief Constructor for intake object
-		/// @param args Args for intake object (see args struct for more info)
-		Intake(IntakeArgs args) :
-			AbstractMG(args.abstractMGArgs),
-			toggle({this, {
-				pros::E_CONTROLLER_DIGITAL_L1,
-				pros::E_CONTROLLER_DIGITAL_L2
-			}}) {}
-
-		bool canMove(bool on) override {
-			return on;
-		}
-
-		void opControl() override {
-			toggle.opControl();
-		}
-	}; // class Intake
 
 	class MogoStopper : public AbstractComponent {
 	private:
@@ -1670,8 +1449,8 @@ namespace hyper {
 
 		using ArgsType = LadyBrownArgs;
 
-		// Target position to move to (start, halfway, end)
-		vector<double> targets = {0, 180, -1};
+		// Target position to move to (start, halfway, 3/4, end)
+		vector<double> targets = {0, 90, 180, -1};
 
 		pros::Rotation sensor;
 
@@ -1679,7 +1458,8 @@ namespace hyper {
 		BtnManager resetBtn;
 
 		bool atManualControl = false;
-		int resetTarget = 1;
+		int resetTarget = 2;
+		int halfTarget = 1;
 		double limit = 32000;
 
 		Buttons manualBtns = {
@@ -1695,12 +1475,17 @@ namespace hyper {
 			currentTarget = std::clamp(currentTarget, 0, limit);
 		}
 
-		void incrementTarget() {
-			changeTarget(1);
+		void incrementTarget(int increment = 2) {
+			changeTarget(increment);
 		}
 
-		void decrementTarget() {
-			changeTarget(-1);
+		void decrementTarget(int increment = 2) {
+			changeTarget(-increment);
+		}
+
+		void setTargetHalf() {
+			atManualControl = false;
+			currentTarget = halfTarget;
 		}
 	private:
 		void manualControl() {
@@ -1728,12 +1513,12 @@ namespace hyper {
 				atManualControl = true;
 			}
 		}
-
+	public:
 		void resetPos() {
 			atManualControl = false;
 			currentTarget = resetTarget;
 		}
-	public:
+	
 		/// @brief Constructor for Lady Brown object
 		/// @param args Args for Lady Brown object (see args struct for more info)
 		LadyBrown(LadyBrownArgs args) : 
@@ -1770,6 +1555,106 @@ namespace hyper {
 		}
 	}; // class LadyBrown
 
+	/// @brief Torus sensor to automatically reject a red/blue torus when detected by optical sensor
+	class TorusSensor : public AbstractComponent {
+	public:
+		std::uint8_t requiredTicks = 50;
+	protected:
+	public:
+		pros::Optical sensor;
+		Conveyer* conveyer;
+
+		bool rejectRed;
+		bool doReject;
+
+		/// @brief Args for torus sensor object
+		/// @param abstractComponentArgs Args for AbstractComponent object
+		/// @param sensorPort Port for sensor
+		/// @param conveyer Pointer to conveyer object
+		/// @param rejectRed Whether to reject red torus
+		/// @param doReject Whether to reject torus
+		struct TorusSensorArgs {
+			AbstractComponentArgs abstractComponentArgs;
+			std::uint8_t sensorPort;
+			Conveyer* conveyer;
+			bool rejectRed;
+			bool doReject;
+		};
+
+		using ArgsType = TorusSensorArgs;
+	
+		struct TorusHues {
+			static constexpr float BLUE[2] = {150, 170};
+			static constexpr float RED[2] = {10, 30};
+		};
+
+		static constexpr float MAX_LED_PWM = 100;
+
+		/// @brief Constructor for torus sensor object
+		/// @param args Args for torus sensor object (see args struct for more info)
+		TorusSensor(TorusSensorArgs args) : 
+			AbstractComponent(args.abstractComponentArgs),
+			sensor(args.sensorPort),
+			rejectRed(args.rejectRed),
+			conveyer(args.conveyer),
+			doReject(args.doReject) {
+				sensor.set_led_pwm(MAX_LED_PWM);
+			};
+	private:
+		/*
+		process of torus sensor:
+		1. (on inital colour sensed) LB stg1
+		2. LB stg0
+		*/
+
+		bool detected = false;
+		bool lastDetected = detected;
+		
+		bool triggered = false;
+		std::int8_t ticks = 0;
+		// each tick is equal to MAINLOOP_DELAY_TIME_MS (should be 20)
+
+		void triggerControl() {
+			requiredTicks++;
+
+			if (ticks >= requiredTicks) {
+				ticks = 0;
+				triggered = false;
+				conveyer->move(true);
+			}
+		}
+
+		void checkTrigger() {
+			if (detected && !lastDetected) { // Run this on 0->1 transition
+				//tell(0, "at stg0");
+				triggered = true;
+				conveyer->move(true, false);
+			} 
+			
+			//if (tick) {tell(0, "AT color");}
+			if (triggered) { triggerControl(); }
+		}
+	public:
+		void opControl() override {
+			float hue = sensor.get_hue();
+
+			bool atRed = isNumBetween(hue, TorusHues::RED[0], TorusHues::RED[1]);
+			bool atBlue = isNumBetween(hue, TorusHues::BLUE[0], TorusHues::BLUE[1]);
+			//bool atBlue = false;
+
+			detected = (rejectRed) ? atRed : atBlue;
+
+			//tell(0, "red/blue: " + std::to_string(atRed) + ", " + std::to_string(atBlue));
+
+			if (doReject) { checkTrigger(); }
+
+			//tell(0, "tick: " + std::to_string(tick) + ", " + std::to_string(hue));
+
+			// don't run anything past this point
+			lastDetected = detected;
+		}
+	}; // class TorusSensor
+
 	class Doinker : public AbstractMech {
 	private:
 	protected:
@@ -1803,6 +1688,40 @@ namespace hyper {
 		}
 	};
 
+	/// @brief Class for timer object to control timings
+	class Timer : public AbstractComponent {
+		private:
+			int waitTime = 20;
+
+			void wait() {
+				pros::delay(waitTime);
+			}
+		protected:
+		public:
+			/// @brief Args for timer object
+			/// @param abstractComponentArgs Args for AbstractComponent object
+			struct TimerArgs {
+				AbstractComponentArgs abstractComponentArgs;
+			};
+
+			using ArgsType = TimerArgs;
+
+			/// @brief Constructor for timer object
+			/// @param args Args for timer object (see args struct for more info)
+			Timer(TimerArgs args) : 
+				AbstractComponent(args.abstractComponentArgs) {};
+
+			/// @brief Gets the wait time for the timer
+			/// @return Time to wait for in milliseconds
+			int getWaitTime() {
+				return waitTime;
+			}
+
+			void opControl() override {
+				wait();
+			}
+	}; // class Timer
+
 	/// @brief Class for hanging mechanism
 	class HangingMech : public AbstractMech {
 	private:
@@ -1832,7 +1751,7 @@ namespace hyper {
 		void opControl() override {
 			actuateBtn.opControl();
 		}
-	};
+	}; // class HangingMech
 
 	/// @brief Class which manages all components
 	class ComponentManager : public AbstractComponent {
@@ -1852,15 +1771,22 @@ namespace hyper {
 
 		TorusSensor torusSensor;
 
-
+		Timer timer;
+		
 		// All components are stored in this vector
 		vector<AbstractComponent*> components;
 
 		/// @brief Args for component manager object passed to the chassis, such as ports
-		/// @param dvtArgs Args for drivetrain object
-		/// @param mogoMechArgs Args for mogo mech object
-		/// @param conveyerArgs Args for conveyer object
-		/// @param intakeArgs Args for intake object
+		/// @param dvtPorts Ports for drivetrain
+		/// @param mogoMechPort Port for mogo mech
+		/// @param doinkerPort Port for doinker
+		/// @param hangingPort Port for hanging mechanism
+		/// @param conveyerPorts Ports for conveyer
+		/// @param ladyBrownPorts Ports for lady brown
+		/// @param ladyBrownRotSensorPort Port for lady brown rotation sensor
+		/// @param mogoStopperPort Port for mogo stopper
+		/// @param torusSensorPort Port for torus sensor
+		/// @param rejectRedToruses Whether to reject red toruses
 		struct ComponentManagerUserArgs {
 			Drivetrain::DrivetrainPorts dvtPorts;
 			char mogoMechPort;
@@ -1872,6 +1798,7 @@ namespace hyper {
 			std::int8_t mogoStopperPort;
 			std::uint8_t torusSensorPort;
 			bool rejectRedToruses;
+			bool rejectToruses;
 		};
 
 		/// @brief Args for component manager object
@@ -1894,7 +1821,8 @@ namespace hyper {
 			doinker({args.aca, args.user.doinkerPort}),
 			hang({args.aca, args.user.hangingPort}),
 			mogoStopper({args.aca, args.user.mogoStopperPort, &mogoMech}),
-			torusSensor({args.aca, args.user.torusSensorPort, &conveyer, args.user.rejectRedToruses}) {					// Add component pointers to vector
+			torusSensor({args.aca, args.user.torusSensorPort, &conveyer, args.user.rejectRedToruses, args.user.rejectToruses}),			
+			timer({args.aca}) { 												// Add component pointers to vector
 				// MUST BE DONE AFTER INITIALISATION not BEFORE because of pointer issues
 				components = {
 					&dvt,
@@ -1903,8 +1831,9 @@ namespace hyper {
 					&ladyBrown,
 					&doinker,
 					&mogoStopper,
-					//&torusSensor,
-					&hang
+					&torusSensor,
+					&hang,
+					&timer
 				};
 			};
 
@@ -1953,56 +1882,6 @@ namespace hyper {
 
 	class MatchAuton : public AbstractAuton {
 	private:
-		void defaultAuton() {
-			// destruction 100
-
-			/*//cm->dvt.moveRelPos(300);
-			//
-			cm->dvt.turnDelay(true, 600);
-			cm->dvt.moveRelPos(100);
-			cm->dvt.turnDelay(false, 400);
-			//cm->dvt.moveRelPos(150);
-			cm->dvt.turnDelay(true, 300);*/
-
-			/*cm->intake.move(true, false);
-			cm->conveyer.move(true);*/
-
-			// Because auton is only 15 secs no need to divide into sectors
-			// Move and collect first rings/discombobulate first
-			//cm->intake.move(true);
-			cm->dvt.turnDelay(true, 600);
-			//pros::delay(MAINLOOP_DELAY_TIME_MS);
-			cm->dvt.moveRelPos(50);
-
-			// Get the far ring and turn back onto main path
-			// (no longer necessarily needed because we start with 1 ring already in the robot)
-			cm->dvt.turnDelay(true, 330);
-			cm->dvt.moveRelPos(105);
-			//pros::delay(MAINLOOP_DELAY_TIME_MS);
-			//cm->dvt.turnDelay(false, 1.5);
-
-			// Get other stack knocked over
-			// optional: increase speed to cm->intake if we have no harvester
-			//cm->dvt.moveRelPos(130);
-			//cm->dvt.moveDelay(600, false);
-			cm->dvt.turnDelay(false, 450);
-			//pros::delay(MAINLOOP_DELAY_TIME_MS);
-			cm->dvt.moveRelPos(160);
-			
-			// Turn into high wall stake & deposit
-			cm->dvt.turnDelay(false, 870);
-			cm->dvt.moveDelay(800, false);
-			//cm->intake.move(false);
-			//liftMech.actuate(true);
-			//pros::delay(MAINLOOP_DELAY_TIME_MS);
-
-			// Deposit on high wall stake
-			//cm->conveyer.move(true, false);
-			pros::delay(2000);
-			//cm->conveyer.move(false);
-			//liftMech.actuate(false);
-		}
-
 		void linedAuton() {
 			cm->dvt.PIDMove(30);
 			cm->dvt.PIDTurn(-45);
@@ -2026,102 +1905,210 @@ namespace hyper {
 			cm->dvt.PIDTurn(-90);
 		}
 
-		void advancedAuton() {
+		void alliance_mogo_leftstart() {
 			// Deposit preload on low wall stake
-				pros::delay(1000);
-				// THIS IS THE LINE THAT CONTROLS HOW FAR FORWARD
-				// TO GO TO THE WALL STAKE
-				cm->dvt.PIDMove(17);
-				//pros::lcd::print(2, "Initial phase complete");
-				pros::delay(500);
+			// THIS IS THE LINE THAT CONTROLS HOW FAR FORWARD
+			// TO GO TO THE WALL STAKE
+			cm->dvt.PIDMove(17);
+			//pros::lcd::print(2, "Initial phase complete");
+			pros::delay(100);
 
-				// Move to mogo
-				cm->dvt.PIDTurn(-90);
-				cm->dvt.moveDelay(1600, false);
-				cm->conveyer.move(true);
-				pros::delay(1000);
+			// Move to mogo
+			cm->dvt.PIDTurn(90);
+			cm->dvt.moveDelay(700, false);
+			cm->conveyer.move(true);
+			pros::delay(750);
+			// stop it from hitting the wall
+			cm->conveyer.move(false);
+			cm->dvt.PIDMove(4);
 
-				// stop it from hitting the wall
-				cm->conveyer.move(false);
-				cm->dvt.PIDMove(3);
+			// Collect mogo
 
-				// Collect mogo
-
-				cm->dvt.PIDTurn(120);
-				pros::delay(50);
-				cm->dvt.PIDMove(-12);
-				cm->mogoMech.actuate(false);
-				pros::delay(80);
-
-				cm->dvt.PIDTurn(120);
-				cm->dvt.PIDMove(10);
-				cm->conveyer.move(true);
-				// uncommnet later
-
-				// Turn halfway through going to mogo
-				// fix to turn 180 degrees
-				//return;
-				// for some reason 90 degrees has become 180 degrees for some reason
-				cm->dvt.PIDTurn(90);
-				//dvt.PIDTurn(90);
-
-				//return;
-
-				pros::delay(200);
-				//cm->dvt.PIDMove(-8);
-				// uncommnet later
-
-				// Collect mogo
-				cm->mogoMech.actuate(true);
-				pros::delay(500);
-
-				//return;
-				// Turn, move and collect rings
-				cm->dvt.PIDTurn(-55);
-				cm->conveyer.move(true);
-				// uncommnet later
-				//cm->dvt.PIDMove(25);
-				pros::delay(500);
-				cm->conveyer.move(false);
-
-				// Prepare for opcontrol
-				//cm->conveyer.move(false);*/
-
-				// OPTIONAL: Turn to face the wall
-				/*
-				cm->dvt.PIDTurn(150);
-				cm->dvt.PIDMove(70);
-				*/
-			
-			
-		}
-
-		void testGpsAuton() {
-			//cm->dvt.PIDGps(0.6096);
-			cm->dvt.BangGPS(0.2096);
-			pros::delay(20000);
-		}
-
-		void aadiAuton() {
+			cm->dvt.PIDTurn(-140);
+			pros::delay(50);
 			cm->mogoMech.actuate(true);
-			cm->dvt.moveSingleVelocity(1);
-			cm->dvt.PIDMove(-29);
+			cm->dvt.PIDMove(-47);
+			cm->mogoMech.actuate(false);
+			pros::delay(80);
+
+			cm->dvt.PIDTurn(-110);
+			pros::delay(100);
+			cm->conveyer.move(true);
+			cm->dvt.PIDMove(20);
+			pros::delay(1000);
+			cm->conveyer.move(false);
+			// uncommnet later
+			//cm->mogoMech.actuate(true);
+			// Turn halfway through going to mogo
+			// fix to turn 180 degrees
+			//return;
+			// for some reason 90 degrees has become 180 degrees for some reason
+			cm->dvt.PIDTurn(-90);
+			//dvt.PIDTurn(90);
+
+			//return;
+
+			
+			//cm->dvt.PIDMove(-8);
+			// uncommnet later
+
+			// Collect mogo
+			/*
 			pros::delay(500);
-			cm->mogoMech.actuate(false);
-			cm->conveyer.move(true);
-			pros::delay(300);
-			cm->dvt.PIDTurn(-57);
-			cm->conveyer.move(true);
-			cm->dvt.PIDMove(30);
-		}
 
-		void testMogoAuton() {
-			pros::delay(2000);
+			//return;
+			// Turn, move and collect rings
+			cm->dvt.PIDTurn(60);
+			cm->conveyer.move(true);
+			pros::delay(500);
 			cm->mogoMech.actuate(true);
-			cm->tell(0, "Mogo actuated");
+			// uncommnet later
+			//cm->dvt.PIDMove(25);
+			pros::delay(500);
+			cm->conveyer.move(false);
+			*/
+			// Prepare for opcontrol
+			//cm->conveyer.move(false);*/
+
+			// OPTIONAL: Turn to face the wall
+			/*
+			cm->dvt.PIDTurn(150);
+			cm->dvt.PIDMove(70);
+			*/			
+			
 			pros::delay(2000);
+		}
+		void alliance_mogo_rightstart() {
+			// Deposit preload on low wall stake
+			// THIS IS THE LINE THAT CONTROLS HOW FAR FORWARD
+			// TO GO TO THE WALL STAKE
+			cm->dvt.PIDMove(15);
+			//pros::lcd::print(2, "Initial phase complete");
+			pros::delay(100);
+
+			// Move to mogo
+			cm->dvt.PIDTurn(-90);
+			cm->dvt.moveDelay(700, false);
+			cm->conveyer.move(true);
+			pros::delay(750);
+			// stop it from hitting the wall
+			cm->conveyer.move(false);
+			cm->dvt.PIDMove(4);
+
+			// Collect mogo
+
+			cm->dvt.PIDTurn(135);
+			pros::delay(50);
+			cm->mogoMech.actuate(true);
+			cm->dvt.PIDMove(-47);
 			cm->mogoMech.actuate(false);
-			cm->tell(0, "Mogo disactuated");
+			pros::delay(80);
+
+			cm->dvt.PIDTurn(110);
+			pros::delay(100);
+			cm->conveyer.move(true);
+			cm->dvt.PIDMove(20);
+			pros::delay(1000);
+			cm->conveyer.move(false);
+			// uncommnet later
+			//cm->mogoMech.actuate(true);
+			// Turn halfway through going to mogo
+			// fix to turn 180 degrees
+			//return;
+			// for some reason 90 degrees has become 180 degrees for some reason
+			cm->dvt.PIDTurn(90);
+			//dvt.PIDTurn(90);
+
+			//return;
+
+			
+			//cm->dvt.PIDMove(-8);
+			// uncommnet later
+
+			// Collect mogo
+			/*
+			pros::delay(500);
+
+			//return;
+			// Turn, move and collect rings
+			cm->dvt.PIDTurn(60);
+			cm->conveyer.move(true);
+			pros::delay(500);
+			cm->mogoMech.actuate(true);
+			// uncommnet later
+			//cm->dvt.PIDMove(25);
+			pros::delay(500);
+			cm->conveyer.move(false);
+			*/
+			// Prepare for opcontrol
+			//cm->conveyer.move(false);*/
+
+			// OPTIONAL: Turn to face the wall
+			/*
+			cm->dvt.PIDTurn(150);
+			cm->dvt.PIDMove(70);
+			*/			
+			
+			pros::delay(2000);
+		}
+		void mogo_corner_left() {
+			//goes to mogo and collects it
+			cm->mogoMech.actuate(true);
+			cm->dvt.PIDMove(-38);
+			pros::delay(200);
+			cm->mogoMech.actuate(false);
+			pros::delay(200);
+			//loads preload on mogo
+			cm->conveyer.move(true);
+			cm->dvt.PIDTurn(-90);
+			//goes to left handside stack
+			cm->dvt.PIDMove(22);
+			pros::delay(1200);
+			cm->doinker.actuate(true);
+			cm->conveyer.move(true,false);
+			cm->dvt.PIDTurn(-180);
+			cm->dvt.PIDTurn(-100);
+			//go to corner
+			cm->dvt.PIDMove(40);
+			cm->dvt.PIDTurn(180);
+			pros::delay(200);
+			//drop off mogo
+			cm->dvt.PIDMove(-10);
+			cm->mogoMech.actuate(true);
+			cm->conveyer.move(true, false);
+
+			cm->conveyer.move(false);
+			cm->dvt.PIDMove(20);
+		}
+		void mogo_corner_right() {
+			//goes to mogo and collects it
+			cm->mogoMech.actuate(true);
+			cm->dvt.PIDMove(-32);
+			pros::delay(200);
+			cm->mogoMech.actuate(false);
+			pros::delay(200);
+			//loads preload on mogo
+			cm->conveyer.move(true);
+			cm->dvt.PIDTurn(90);
+			//goes to left handside stack
+			cm->dvt.PIDMove(22);
+			pros::delay(1200);
+			cm->doinker.actuate(true);
+			
+			cm->dvt.PIDTurn(180);
+			cm->dvt.PIDTurn(100);
+			//go to corner
+			cm->dvt.PIDMove(48);
+			cm->dvt.PIDTurn(180);
+			cm->dvt.PIDTurn(60);
+			pros::delay(200);
+			//drop off mogo
+			cm->dvt.PIDMove(-10);
+			cm->mogoMech.actuate(true);
+			cm->conveyer.move(true, false);
+
+			cm->conveyer.move(false);
+			cm->dvt.PIDMove(20);
 		}
 	protected:
 	public:
@@ -2140,14 +2127,14 @@ namespace hyper {
 		void run() override {
 			// just comment out the auton function u dont want
 
-			//defaultAuton();
 			//calcCoefficientAuton();
 			//calcTurnAuton();
 			//testIMUAuton();
 			//linedAuton();
-			//aadiAuton();
-			advancedAuton();
-			//testGpsAuton();
+			//alliance_mogo_rightstart();
+			//alliance_mogo_leftstart();
+			//mogo_corner_left();
+			mogo_corner_right();
 		}
 	}; // class MatchAuton
 
@@ -2159,90 +2146,165 @@ namespace hyper {
 			// horrible terrible but oh well
 			// Preload onto wall stake and go forward to clamp mogo
 			cm->dvt.setBrakeModes(pros::E_MOTOR_BRAKE_COAST);
-			mogo.set_value(true);
 
 			// wall stake
 			cm->conveyer.move(true);
-			pros::delay(200);
-			cm->conveyer.move(false);
-
-			// turn and get mogo
-			cm->dvt.PIDMove(5.5);
-			cm->dvt.PIDTurn(-90);
+			pros::delay(500);
 			
-			cm->dvt.PIDMove(-6, 1.6);
+			cm->conveyer.move(false);
+			// turn and get mogo
+			cm->dvt.PIDMove(10);
+			cm->dvt.PIDTurn(-90);
+			mogo.set_value(true);
+			
+			cm->dvt.PIDMove(-28, 1.6);
 			
 			mogo.set_value(false);
-			pros::delay(500);
+			pros::delay(100);
 							
 			// Collect rings onto mogo
 			cm->dvt.PIDTurn(-90);
-			cm->tell(0, "AFTER FIRST TURN");
-			pros::delay(500);
-			cm->dvt.PIDTurn(-75);
+			cm->dvt.PIDTurn(-90);
 			cm->tell(0, "AFTER SECOND TURN");
-			pros::delay(500);
-
+			
 			cm->conveyer.move(true);
 			//cm->dvt.PIDTurn(3);
-			cm->dvt.moveDelay(1400);
-			pros::delay(500);
-			cm->dvt.turnDelay(false, 1500);
-			cm->dvt.PIDMove(-10);
+			cm->dvt.PIDMove(28);
+			//pros::delay(100);
+			cm->dvt.PIDMove(15);	
+			
+			
+			
+			cm->dvt.PIDMove(-5);
+			
+			cm->dvt.PIDTurn(110);
+
+			
+			cm->dvt.PIDMove(15);
+
+			//pros::delay(100);
+			
+			cm->conveyer.move(true);
+			cm->dvt.PIDTurn(-100);
+			cm->conveyer.move(false);
+			
+			cm->dvt.PIDTurn(-110);
+			
+			
+			cm->conveyer.move(true);
+			cm->dvt.PIDMove(40);
+			
+			
+			cm->dvt.PIDTurn(-30);
+			
+			
+			cm->dvt.PIDMove(-45);
 			
 			cm->conveyer.move(true, false);
 
-			pros::delay(500);
+			//pros::delay(500);
 
 			cm->conveyer.move(false);
 			
 			mogo.set_value(true);
-			pros::delay(200);
+			//pros::delay(200);
 		}
 
 		void sector2() {
-			cm->dvt.PIDMove(5);
+			cm->dvt.PIDMove(10);
 
 			// turn to the mogo on the other end
 			// and go for it!
-			cm->dvt.PIDTurn(120);
-			cm->dvt.PIDMove(-34);
-			pros::delay(200);
+			cm->dvt.PIDTurn(80);
+			cm->dvt.PIDMove(-117);
+			//pros::delay(200);
 			mogo.set_value(false);
-			pros::delay(200);
+			pros::delay(50);
 
-			cm->dvt.PIDTurn(-90);
-			pros::delay(40);
-			cm->dvt.PIDTurn(-75);
+			cm->dvt.PIDTurn(90);
+			cm->tell(0, "AFTER FIRST TURN");
+			cm->dvt.PIDTurn(80);
+			cm->tell(0, "AFTER SECOND TURN");
+			//pros::delay(200);
 
 			cm->conveyer.move(true);
-			cm->dvt.PIDMove(10);
-			cm->dvt.PIDTurn(120);
-			cm->dvt.PIDMove(-300);
-			pros::delay(100);
-			mogo.set_value(true);
-			cm->conveyer.move(true, false);
-			pros::delay(100);
+			//cm->dvt.PIDTurn(3);
 			cm->dvt.PIDMove(30);
-			pros::delay(1000);
-			cm->dvt.PIDTurn(170);
-			pros::delay(1000);
+			//pros::delay(200);
 			cm->dvt.PIDMove(-5);
-			cm->conveyer.move(false);
-			pros::delay(100);
-			mogo.set_value(false);
-			pros::delay(200);
-			cm->dvt.PIDTurn(-100);
-			pros::delay(200);
-			cm->dvt.PIDMove(-40);
-			pros::delay(200);
+			//pros::delay(200);
+			cm->dvt.PIDTurn(-10);
+			//pros::delay(200);
+			//pros::delay(200);
+			cm->dvt.PIDTurn(90);
+			//pros::delay(200);
+			cm->dvt.PIDTurn(60);
+			//pros::delay(200);
+			
+			//pros::delay(200);
+			cm->dvt.PIDMove(-15);
+		
+			
+			cm->conveyer.move(true, false);
+
+			//pros::delay(500);
+
+			
+			
 			mogo.set_value(true);
-			pros::delay(200);
-			cm->conveyer.move(true,false);
-			pros::delay(200);
-			cm->dvt.PIDMove(100);
+			pros::delay(50);
+			cm->dvt.PIDMove(20);
+			cm->dvt.PIDTurn(-30);
+			
 			pros::delay(200);
 		}
+
+		void sector3() {
+			mogo.set_value(true);
+			cm->conveyer.move(true);
+			cm->dvt.PIDMove(60);
+			cm->doinker.actuate(true);
+			cm->dvt.PIDTurn(60);
+			cm->dvt.PIDMove(30);
+			//pros::delay(200);
+			mogo.set_value(true); //incase the mogo has not unactuated already
+			cm->dvt.PIDTurn(90);
+			cm->dvt.PIDTurn(55);
+			cm->dvt.PIDMove(-25);
+			mogo.set_value(false);
+
+		}
+		void sector4() {
+			cm->doinker.actuate(false);
+			cm->dvt.PIDTurn(-90);
+			cm->dvt.PIDMove(-40);
+			cm->conveyer.move(false);
+
+			//pros::delay(500);
+
+			cm->conveyer.move(false);
+			
+			mogo.set_value(true);
+
+		}
+		void sector5() {
+			cm->dvt.PIDMove(110);
+			cm->dvt.PIDTurn(-45);
+			cm->dvt.PIDMove(30);
+			cm->conveyer.move(true);
+			cm->dvt.PIDMove(-10);
+			cm->dvt.PIDMove(30);
+			cm->dvt.PIDMove(-5);
+			cm->doinker.actuate(true);
+			cm->dvt.PIDTurn(720);
+			cm->doinker.actuate(false);
+			cm->dvt.PIDMove(35);
+			cm->conveyer.move(false);
+			cm->dvt.PIDMove(5);
+			cm->dvt.PIDMove(-10);
+		}
+		
+		
 	protected:
 	public:
 		/// @brief Args for skills auton object
@@ -2263,6 +2325,9 @@ namespace hyper {
 
 			sector1();
 			sector2();
+			sector3();
+			sector4();
+			sector5();
 		}
 	}; // class SkillsAuton
 
@@ -2471,7 +2536,7 @@ void initDefaultChassis() {
 		MOGO_MECH_PORT, DOINKER_PORT, HANGING_MECH_PORT, // Mech args
 		CONVEYER_PORTS, LADY_BROWN_PORTS, // MG args
 		LADY_BROWN_ROT_SENSOR_PORT, MOGO_SENSOR_PORT, // Sensor args
-		CONV_TORUS_PORT, REJECT_COLOR_RED}}); // Torus sensor args
+		CONV_TORUS_PORT, REJECT_COLOR_RED, DO_REJECT_COLOR}}); // Torus sensor args
 	
 	currentChassis = &defaultChassis;
 }
@@ -2545,11 +2610,7 @@ void pneumaticstestcontrol () {
 	}
 }
 
-void testAllAuton() {
-	if (DO_SKILLS_AUTON) {
-		currentChassis->skillsAuton();
-	}
-
+void testMatchAuton() {
 	if (MATCH_AUTON_TEST) {
 		autonomous();
 	}
@@ -2562,7 +2623,11 @@ void preControl() {
 
 	// competition auton test safeguard
 	if (!inComp) {
-		testAllAuton();
+		testMatchAuton();
+	}
+
+	if (DO_SKILLS_AUTON) {
+		currentChassis->skillsAuton();
 	}
 
 	if (DO_SKILLS_PREP) {
@@ -2581,8 +2646,6 @@ void mainloopControl() {
 	while (opControlRunning) {
 		// Chassis opcontrol
 		currentChassis->opControl();
-
-		pros::delay(MAINLOOP_DELAY_TIME_MS);
 	}
 }
 
